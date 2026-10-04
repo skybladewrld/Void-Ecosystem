@@ -96,6 +96,10 @@ class NavigationTests(unittest.TestCase):
         self.app.hardware.update(12)
         self.assertGreater(self.app.hardware.snapshot().battery_percent, drained)
 
+    def test_starting_battery_can_be_overridden_for_device_testing(self):
+        app = VoidFlipApp(show_splash=False, persist=False, battery_percent=0.1)
+        self.assertAlmostEqual(app.hardware.snapshot().battery_percent, 0.1)
+
     def test_profile_round_trip(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "profile.json"

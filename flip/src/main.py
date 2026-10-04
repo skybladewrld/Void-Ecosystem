@@ -10,7 +10,11 @@ def parse_args():
     parser.add_argument("--no-splash", action="store_true", help="skip the startup splash")
     parser.add_argument("--smoke-test", action="store_true", help="run a short headless navigation check")
     parser.add_argument("--screenshot", type=Path, help="save a home-screen screenshot and exit")
-    return parser.parse_args()
+    parser.add_argument("--battery", type=float, metavar="PERCENT", help="override the starting battery from 0 to 100")
+    args = parser.parse_args()
+    if args.battery is not None and not 0 <= args.battery <= 100:
+        parser.error("--battery must be between 0 and 100")
+    return args
 
 
 def run_smoke_test():
@@ -66,7 +70,10 @@ def main():
 
     from app import VoidFlipApp
 
-    app = VoidFlipApp(show_splash=not args.no_splash and args.screenshot is None)
+    app = VoidFlipApp(
+        show_splash=not args.no_splash and args.screenshot is None,
+        battery_percent=args.battery,
+    )
     if args.screenshot:
         app.run(max_frames=2, screenshot=args.screenshot.resolve())
     else:

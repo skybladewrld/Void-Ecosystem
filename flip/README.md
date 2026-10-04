@@ -23,6 +23,14 @@ py -m pip install -r requirements.txt
 py flip/src/main.py
 ```
 
+To test critical-power behavior at 0.1%:
+
+```powershell
+py flip/src/main.py --battery 0.1 --no-splash
+```
+
+`--battery` accepts any starting percentage from `0` through `100` and overrides the saved charge for that launch.
+
 ## Controls
 
 | Action | Keys | Simulated control |

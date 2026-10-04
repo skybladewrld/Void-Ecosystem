@@ -70,7 +70,7 @@ def fit_text(font, value, max_width):
 class VoidFlipApp:
     """Hardware-agnostic interface with trusted, persistent companion state."""
 
-    def __init__(self, *, show_splash=True, persist=True, save_path=None):
+    def __init__(self, *, show_splash=True, persist=True, save_path=None, battery_percent=None):
         pygame.init()
         pygame.display.set_caption("Void Flip v0.2.1")
         self.surface = pygame.display.set_mode(WINDOW_SIZE)
@@ -102,8 +102,9 @@ class VoidFlipApp:
         self.game_stats = {"void_merge_high_score": 0}
         self.game_stats.update(payload.get("game_stats", {}))
         self.void_merge = VoidMergeGame()
+        initial_battery = payload.get("battery_percent", 86.0) if battery_percent is None else battery_percent
         self.hardware = DesktopHardwareAdapter(
-            battery_percent=float(payload.get("battery_percent", 86.0)),
+            battery_percent=float(initial_battery),
             charging=self.settings["SIM CHARGER"],
         )
         elapsed = max(0.0, time.time() - self.voidling.last_updated)
