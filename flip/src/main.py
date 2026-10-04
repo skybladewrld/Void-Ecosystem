@@ -1,4 +1,4 @@
-"""Launch Void Flip v0.2 from the repository root with `py flip/src/main.py`."""
+"""Launch Void Flip v0.2.1 from the repository root with `py flip/src/main.py`."""
 
 import argparse
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Void Flip v0.2 desktop simulator")
+    parser = argparse.ArgumentParser(description="Void Flip v0.2.1 desktop simulator")
     parser.add_argument("--no-splash", action="store_true", help="skip the startup splash")
     parser.add_argument("--smoke-test", action="store_true", help="run a short headless navigation check")
     parser.add_argument("--screenshot", type=Path, help="save a home-screen screenshot and exit")
@@ -18,7 +18,7 @@ def run_smoke_test():
 
     from app import MENU_ITEMS, VoidFlipApp
 
-    app = VoidFlipApp(show_splash=False)
+    app = VoidFlipApp(show_splash=False, persist=False)
     assert app.page == "HOME"
     for index, item in enumerate(MENU_ITEMS):
         app.selected_index = index
@@ -31,17 +31,29 @@ def run_smoke_test():
     app.handle_action("up")
     assert app.selected_index == len(MENU_ITEMS) - 1
     assert app.voidling.name and 0.0 <= app.voidling.xp_progress <= 1.0
+    app.open_page("VOIDLING")
+    app.handle_action("select")
+    assert app.page == "CARE"
+    before_actions = app.voidling.total_actions
+    app.handle_action("select")
+    assert app.voidling.total_actions == before_actions + 1
+    app.handle_action("back")
+    assert app.page == "VOIDLING"
     app.open_page("GAMES")
     app.handle_action("select")
-    assert app.page == "SIGNAL CATCH"
-    app.handle_action("back")
-    assert app.page == "GAMES"
+    assert app.page == "VOID MERGE 2048"
+    app.void_merge.board = [[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+    app.handle_action("left")
+    assert app.void_merge.score == 4
+    before_battery = app.hardware.snapshot().battery_percent
+    app.hardware.update(80)
+    assert app.hardware.snapshot().battery_percent < before_battery
     app.handle_action("quit")
     assert not app.running
     import pygame
 
     pygame.quit()
-    print("Void Flip v0.2 smoke test passed: shell, modules, settings, game, Voidling, and quit state are ready.")
+    print("Void Flip v0.2.1 smoke test passed: companion loop, hardware telemetry, navigation, and Void Merge are ready.")
 
 
 def main():

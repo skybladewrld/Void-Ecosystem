@@ -1,18 +1,20 @@
 # Void Flip
 
-Void Flip is the portable handheld in the Void Ecosystem. Version 0.2 grows the runnable desktop simulator into the first interactive shell while the physical screens, controls, and Raspberry Pi-class computer are still being designed.
+Void Flip is the portable handheld in the Void Ecosystem. Version 0.2.1 focuses on making the companion and device simulation real before game production begins.
 
-## What v0.2 includes
+## What v0.2.1 includes
 
 - Balanced dual-screen chassis with equal-width top and bottom halves
-- Polished home dashboard and populated Games, Emulators, Friends, Trading, and Settings modules
-- `Signal Catch`, a playable built-in arcade prototype with score and miss tracking
-- Interactive scanline, animation, and status-detail settings
-- Context-aware bottom display for the Voidling, game telemetry, and setting previews
-- Bottom-screen Voidling companion with name, level, XP, energy, mood, mini inventory, and idle animation
-- Keyboard input separated from rendering so hardware input can replace it later
+- Persistent Voidling energy, fullness, joy, health, bond, XP, and levels
+- Five care routines with costs, effects, cooldowns, exploration drops, and resource checks
+- Seven defined items, six effect-bearing relics, and three material-based relic recipes
+- Usable inventory, equip/unequip controls, a workshop, and journal achievements
+- A live battery simulation that drains, charges, autosaves, and sits behind a Raspberry Pi-ready adapter
+- Interactive scanline, animation, status-detail, and simulated-charger settings
+- A game-by-game production roadmap that does not label unfinished prototypes as playable
+- Void Merge 2048 with complete board rules, pause, restart, end states, and saved high score
 
-The top display is treated as non-touch. The bottom display is structured as a separate context area so touch input can be added later.
+The top display is treated as non-touch. The bottom display is a separate context area so touch input can be added later.
 
 ## Run from the repository root
 
@@ -28,17 +30,24 @@ py flip/src/main.py
 | Navigate | Arrow keys or W/A/S/D | D-pad |
 | Select | Enter or Space | A button |
 | Back | Escape or Backspace | B button |
+| Pause | Enter, Space, or P during Void Merge | Start button |
+| Restart | R during Void Merge | Restart shortcut |
 | Quit | Q | System shortcut |
 
-On the home screen, Up/Down moves through the menu. Module lists also use Up/Down. Select launches the ready game or toggles a setting; Back moves up one level. In Signal Catch, move left and right to catch the falling signal.
+Select performs a care action, uses an item, equips a relic, crafts a recipe, or toggles a setting depending on the page. Back moves up one level.
+
+Progress is saved automatically to `%APPDATA%\VoidEcosystem\flip-profile.json` on Windows. Use **Settings → Sim Charger** to see the battery reverse from draining to charging.
 
 ## Source layout
 
 - `src/main.py` — launch entry point and command-line options
 - `src/app.py` — application loop, input mapping, navigation, and screen composition
-- `src/content.py` — library, emulator, friend, trade, and setting content
-- `src/theme.py` — shared colors, typography helpers, panels, and sharp corner accents
-- `src/models.py` — expandable data models for the Voidling and inventory
-- `tests/test_navigation.py` — headless state/navigation checks
+- `src/content.py` — platform-owned items, relics, recipes, and library content
+- `src/models.py` — Voidling simulation and progression rules
+- `src/hardware.py` — simulated telemetry and the future hardware adapter contract
+- `src/games/void_merge.py` — tested Void Merge 2048 rules
+- `src/persistence.py` — versioned atomic local saves
+- `src/theme.py` — shared visual primitives
+- `tests/test_navigation.py` — headless navigation, simulation, save, and rendering checks
 
-The empty asset folders are ready for later sprites, sound effects, and licensed fonts. v0.1 draws everything procedurally and needs no external assets.
+The current interface is drawn procedurally and needs no external assets.
