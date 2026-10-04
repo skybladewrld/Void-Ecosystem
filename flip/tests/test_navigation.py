@@ -100,6 +100,17 @@ class NavigationTests(unittest.TestCase):
         app = VoidFlipApp(show_splash=False, persist=False, battery_percent=0.1)
         self.assertAlmostEqual(app.hardware.snapshot().battery_percent, 0.1)
 
+    def test_normal_simulator_launch_starts_fully_charged(self):
+        app = VoidFlipApp(show_splash=False, persist=False)
+        self.assertEqual(app.hardware.snapshot().battery_percent, 100.0)
+
+    def test_old_saved_battery_does_not_override_full_charge_assumption(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            ProfileStore(path).save({"battery_percent": 0.1})
+            app = VoidFlipApp(show_splash=False, save_path=path)
+            self.assertEqual(app.hardware.snapshot().battery_percent, 100.0)
+
     def test_profile_round_trip(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "profile.json"

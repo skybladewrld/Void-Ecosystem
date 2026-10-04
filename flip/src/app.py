@@ -102,7 +102,7 @@ class VoidFlipApp:
         self.game_stats = {"void_merge_high_score": 0}
         self.game_stats.update(payload.get("game_stats", {}))
         self.void_merge = VoidMergeGame()
-        initial_battery = payload.get("battery_percent", 86.0) if battery_percent is None else battery_percent
+        initial_battery = 100.0 if battery_percent is None else battery_percent
         self.hardware = DesktopHardwareAdapter(
             battery_percent=float(initial_battery),
             charging=self.settings["SIM CHARGER"],
@@ -119,11 +119,9 @@ class VoidFlipApp:
         if not self.store:
             return
         self.voidling.last_updated = time.time()
-        snapshot = self.hardware.snapshot()
         self.store.save({
             "voidling": self.voidling.to_dict(),
             "settings": self.settings,
-            "battery_percent": round(snapshot.battery_percent, 3),
             "game_stats": self.game_stats,
         })
 

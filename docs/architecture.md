@@ -40,7 +40,7 @@ Games / emulators / Voidling / networking
 
 A managed boot-to-shell setup on a maintained Linux base is the current direction. Real battery percentage should come from a supported fuel-gauge/UPS board; CPU voltage is not a trustworthy charge estimate.
 
-The desktop battery is deliberately simulated: it drains at one percentage point per 80 seconds and charges at one point per 12 seconds. Its last value and charger setting are persisted. Those rates are development feedback, not final hardware power estimates.
+The desktop battery is deliberately simulated: each normal launch starts at 100%, drains at one percentage point per 80 seconds, and charges at one point per 12 seconds when the simulated charger is enabled. A command-line override supports low-power tests. Those rates are development feedback, not final hardware power estimates.
 
 ## Future boundaries
 

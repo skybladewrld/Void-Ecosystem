@@ -31,6 +31,8 @@ py flip/src/main.py --battery 0.1 --no-splash
 
 `--battery` accepts any starting percentage from `0` through `100` and overrides the saved charge for that launch.
 
+Every normal desktop simulator launch begins at 100%. Later Raspberry Pi hardware will replace that temporary assumption with live charge data from a supported fuel-gauge or UPS board through the existing hardware adapter.
+
 ## Controls
 
 | Action | Keys | Simulated control |

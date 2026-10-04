@@ -27,7 +27,7 @@ class HardwareAdapter(Protocol):
 class DesktopHardwareAdapter:
     """Changing telemetry for PC testing; replace with Pi services later."""
 
-    def __init__(self, battery_percent: float = 86.0, charging: bool = False):
+    def __init__(self, battery_percent: float = 100.0, charging: bool = False):
         self.battery_percent = max(0.0, min(100.0, battery_percent))
         self.charging = charging
         self.started_at = time.monotonic()
