@@ -1,38 +1,37 @@
 """Core Void Flip simulator state, input, and rendering."""
 
 import math
+import random
 import time
 from pathlib import Path
 
 import pygame
 
+from content import EMULATOR_SYSTEMS, FRIEND_SLOTS, GAME_LIBRARY, SETTING_LABELS, TRADE_ITEMS
 from models import Voidling
 from theme import (
-    BLACK, BODY, BODY_EDGE, GREEN, MUTED, PANEL_LIGHT, PURPLE, PURPLE_DARK,
-    PURPLE_LIGHT, SCREEN, WHITE, draw_meter, draw_panel, draw_text, make_fonts,
+    BLACK, BODY, BODY_EDGE, GREEN, MUTED, PANEL, PANEL_LIGHT, PURPLE,
+    PURPLE_DARK, PURPLE_LIGHT, SCREEN, WHITE, draw_meter, draw_panel,
+    draw_text, make_fonts,
 )
 
 
 WINDOW_SIZE = (1200, 900)
-TOP_SCREEN = pygame.Rect(210, 78, 780, 386)
+CHASSIS_LEFT = 92
+CHASSIS_WIDTH = 1016
+TOP_BODY = pygame.Rect(CHASSIS_LEFT, 35, CHASSIS_WIDTH, 472)
+BOTTOM_BODY = pygame.Rect(CHASSIS_LEFT, 520, CHASSIS_WIDTH, 342)
+TOP_SCREEN = pygame.Rect(170, 78, 860, 386)
 BOTTOM_SCREEN = pygame.Rect(405, 572, 390, 242)
 MENU_ITEMS = ("GAMES", "EMULATORS", "FRIENDS", "TRADING", "SETTINGS")
 
-MODULE_COPY = {
-    "GAMES": ("GAME LIBRARY", "Installed Void games will appear here.", "No games installed  //  v0.1 placeholder"),
-    "EMULATORS": ("EMULATOR BAY", "Configured systems and launchers will live here.", "No emulators configured  //  v0.1 placeholder"),
-    "FRIENDS": ("FRIEND LINK", "Local presence and direct connections will appear here.", "OFFLINE  //  local profile only"),
-    "TRADING": ("TRADE TERMINAL", "Validated item trades will be managed here.", "LOCKED  //  trusted services not implemented"),
-    "SETTINGS": ("SYSTEM SETTINGS", "Display, audio, controls, and device options.", "DESKTOP SIMULATOR  //  build 0.1"),
-}
-
 
 class VoidFlipApp:
-    """A single app object that can later accept hardware input adapters."""
+    """State and renderer for the hardware-agnostic Void Flip shell."""
 
     def __init__(self, *, show_splash=True):
         pygame.init()
-        pygame.display.set_caption("Void Flip v0.1")
+        pygame.display.set_caption("Void Flip v0.2")
         self.surface = pygame.display.set_mode(WINDOW_SIZE)
         self.clock = pygame.time.Clock()
         self.fonts = make_fonts()
@@ -40,26 +39,106 @@ class VoidFlipApp:
         self.running = True
         self.page = "HOME"
         self.selected_index = 0
+        self.module_index = 0
         self.started_at = time.monotonic()
         self.show_splash = show_splash
-        self.splash_duration = 2.35
+        self.splash_duration = 2.15
         self.transition = 0.0
+        self.toast = "SYSTEM READY"
+        self.toast_timer = 0.0
+        self.settings = {
+            "SCANLINES": True,
+            "ANIMATIONS": True,
+            "STATUS DETAIL": True,
+        }
+
+        # Signal Catch is the first real built-in game loop.
+        self.game_player_x = TOP_SCREEN.width // 2
+        self.game_orb_x = 230
+        self.game_orb_y = 98.0
+        self.game_score = 0
+        self.game_misses = 0
 
     def handle_action(self, action):
-        """Update navigation without depending on a particular input device."""
+        """Update state without depending on a particular physical input source."""
 
         if action == "quit":
             self.running = False
-        elif action == "back" and self.page != "HOME":
-            self.page = "HOME"
-            self.transition = 1.0
-        elif action == "up" and self.page == "HOME":
-            self.selected_index = (self.selected_index - 1) % len(MENU_ITEMS)
-        elif action == "down" and self.page == "HOME":
-            self.selected_index = (self.selected_index + 1) % len(MENU_ITEMS)
-        elif action == "select" and self.page == "HOME":
-            self.page = MENU_ITEMS[self.selected_index]
-            self.transition = 1.0
+            return
+
+        if self.page == "SIGNAL CATCH":
+            if action == "back":
+                self.open_page("GAMES")
+            elif action == "left":
+                self.game_player_x = max(80, self.game_player_x - 30)
+            elif action == "right":
+                self.game_player_x = min(TOP_SCREEN.width - 80, self.game_player_x + 30)
+            return
+
+        if action == "back":
+            if self.page != "HOME":
+                self.open_page("HOME")
+            return
+
+        if self.page == "HOME":
+            if action == "up":
+                self.selected_index = (self.selected_index - 1) % len(MENU_ITEMS)
+            elif action == "down":
+                self.selected_index = (self.selected_index + 1) % len(MENU_ITEMS)
+            elif action == "select":
+                self.open_page(MENU_ITEMS[self.selected_index])
+            return
+
+        row_count = self.module_row_count()
+        if action == "up":
+            self.module_index = (self.module_index - 1) % row_count
+        elif action == "down":
+            self.module_index = (self.module_index + 1) % row_count
+        elif action in ("left", "right", "select"):
+            self.activate_module_row()
+
+    def open_page(self, page):
+        self.page = page
+        self.module_index = 0
+        self.transition = 1.0
+        self.toast_timer = 0.0
+
+    def module_row_count(self):
+        if self.page == "GAMES":
+            return len(GAME_LIBRARY)
+        if self.page == "SETTINGS":
+            return len(SETTING_LABELS)
+        return 3
+
+    def activate_module_row(self):
+        if self.page == "GAMES":
+            game = GAME_LIBRARY[self.module_index]
+            if game.playable:
+                self.reset_game()
+                self.open_page(game.title)
+            else:
+                self.show_toast(f"{game.title} // NOT INSTALLED")
+        elif self.page == "SETTINGS":
+            label = SETTING_LABELS[self.module_index]
+            self.settings[label] = not self.settings[label]
+            self.show_toast(f"{label} // {'ON' if self.settings[label] else 'OFF'}")
+        elif self.page == "EMULATORS":
+            self.show_toast("CONFIGURATION REQUIRED")
+        elif self.page == "FRIENDS":
+            self.show_toast("LOCAL DISCOVERY ACTIVE")
+        elif self.page == "TRADING":
+            self.show_toast("TRUSTED TRADE SERVICE REQUIRED")
+
+    def show_toast(self, message):
+        self.toast = message
+        self.toast_timer = 2.2
+
+    def reset_game(self):
+        self.game_player_x = TOP_SCREEN.width // 2
+        self.game_orb_x = random.randint(90, TOP_SCREEN.width - 90)
+        self.game_orb_y = 102.0
+        self.game_score = 0
+        self.game_misses = 0
 
     @staticmethod
     def action_for_event(event):
@@ -80,6 +159,22 @@ class VoidFlipApp:
 
     def update(self, dt):
         self.transition = max(0.0, self.transition - dt * 4.5)
+        self.toast_timer = max(0.0, self.toast_timer - dt)
+        if self.page == "SIGNAL CATCH":
+            self.update_signal_catch(dt)
+
+    def update_signal_catch(self, dt):
+        self.game_orb_y += (112 + self.game_score * 5) * dt
+        catch_y = 306
+        if self.game_orb_y >= catch_y:
+            if abs(self.game_orb_x - self.game_player_x) <= 62:
+                self.game_score += 1
+                self.show_toast("SIGNAL CAPTURED")
+            else:
+                self.game_misses += 1
+                self.show_toast("SIGNAL LOST")
+            self.game_orb_x = random.randint(90, TOP_SCREEN.width - 90)
+            self.game_orb_y = 102.0
 
     def draw(self):
         elapsed = time.monotonic() - self.started_at
@@ -91,15 +186,15 @@ class VoidFlipApp:
         pygame.display.flip()
 
     def draw_splash(self, progress):
-        glow = int(95 + 45 * math.sin(progress * math.pi))
-        draw_text(self.surface, self.fonts["title"], "VOID", (600, 390), (190, glow, 255), center=True)
-        draw_text(self.surface, self.fonts["small"], "FLIP SYSTEM // INITIALIZING", (600, 456), MUTED, center=True)
-        bar = pygame.Rect(420, 500, 360, 8)
+        glow = int(105 + 55 * math.sin(progress * math.pi))
+        draw_text(self.surface, self.fonts["title"], "VOID", (600, 378), (195, glow, 255), center=True)
+        draw_text(self.surface, self.fonts["small"], "FLIP SHELL // BUILD 0.2", (600, 446), MUTED, center=True)
+        bar = pygame.Rect(420, 493, 360, 8)
         pygame.draw.rect(self.surface, (29, 26, 38), bar)
         pygame.draw.rect(self.surface, PURPLE, (bar.x, bar.y, int(bar.width * progress), bar.height))
         for x in range(bar.x, bar.right, 24):
             pygame.draw.line(self.surface, BLACK, (x, bar.y), (x, bar.bottom), 1)
-        draw_text(self.surface, self.fonts["tiny"], f"BOOT {int(progress * 100):02d}%", (600, 530), PURPLE_LIGHT, center=True)
+        draw_text(self.surface, self.fonts["tiny"], f"SYNC {int(progress * 100):02d}%", (600, 526), PURPLE_LIGHT, center=True)
 
     def draw_console(self, elapsed):
         self.draw_body()
@@ -107,72 +202,195 @@ class VoidFlipApp:
         bottom = self.surface.subsurface(BOTTOM_SCREEN)
         top.fill(SCREEN)
         bottom.fill(SCREEN)
-        self.draw_home(top) if self.page == "HOME" else self.draw_module(top)
-        self.draw_voidling_screen(bottom, elapsed)
+
+        if self.page == "HOME":
+            self.draw_home(top)
+        elif self.page == "SIGNAL CATCH":
+            self.draw_signal_catch(top)
+        else:
+            self.draw_module(top)
+        self.draw_bottom_context(bottom, elapsed)
         self.draw_controls()
+
+        if self.settings["SCANLINES"]:
+            self.draw_scanlines(top)
+            self.draw_scanlines(bottom, spacing=5, alpha=10)
         if self.transition > 0:
             veil = pygame.Surface(TOP_SCREEN.size, pygame.SRCALPHA)
-            veil.fill((153, 86, 255, int(self.transition * 70)))
+            veil.fill((153, 86, 255, int(self.transition * 58)))
             top.blit(veil, (0, 0))
 
     def draw_body(self):
-        top_body = pygame.Rect(165, 35, 870, 472)
-        lower_body = pygame.Rect(92, 520, 1016, 342)
-        pygame.draw.rect(self.surface, BODY, top_body, border_radius=22)
-        pygame.draw.rect(self.surface, BODY_EDGE, top_body, 2, border_radius=22)
-        pygame.draw.rect(self.surface, BODY, lower_body, border_radius=28)
-        pygame.draw.rect(self.surface, BODY_EDGE, lower_body, 2, border_radius=28)
-        pygame.draw.rect(self.surface, (9, 10, 14), (210, 502, 780, 32))
-        pygame.draw.line(self.surface, PURPLE_DARK, (245, 518), (955, 518), 2)
+        # Both halves share the exact same left edge and width in v0.2.
+        pygame.draw.rect(self.surface, BODY, TOP_BODY, border_radius=26)
+        pygame.draw.rect(self.surface, BODY_EDGE, TOP_BODY, 2, border_radius=26)
+        pygame.draw.rect(self.surface, BODY, BOTTOM_BODY, border_radius=28)
+        pygame.draw.rect(self.surface, BODY_EDGE, BOTTOM_BODY, 2, border_radius=28)
+
+        hinge = pygame.Rect(166, 501, 868, 34)
+        pygame.draw.rect(self.surface, (9, 10, 14), hinge)
+        pygame.draw.line(self.surface, PURPLE_DARK, (205, 518), (995, 518), 2)
+        for x in (205, 995):
+            pygame.draw.circle(self.surface, BODY_EDGE, (x, 518), 6, 2)
+
         pygame.draw.rect(self.surface, (2, 3, 6), TOP_SCREEN.inflate(12, 12), border_radius=4)
         pygame.draw.rect(self.surface, PURPLE_DARK, TOP_SCREEN.inflate(12, 12), 2, border_radius=4)
         pygame.draw.rect(self.surface, (2, 3, 6), BOTTOM_SCREEN.inflate(12, 12), border_radius=4)
         pygame.draw.rect(self.surface, BODY_EDGE, BOTTOM_SCREEN.inflate(12, 12), 2, border_radius=4)
         pygame.draw.circle(self.surface, PURPLE_DARK, (600, 58), 3)
-        draw_text(self.surface, self.fonts["tiny"], "VOID // FLIP", (497, 836), MUTED)
+        draw_text(self.surface, self.fonts["tiny"], "VOID // FLIP 02", (485, 836), MUTED)
+
+    def draw_header(self, screen, section, title, right_text="SYSTEM READY"):
+        draw_text(screen, self.fonts["tiny"], f"VOID SHELL  /  {section}", (28, 18), PURPLE_LIGHT)
+        draw_text(screen, self.fonts["heading"], title, (28, 39))
+        right_width = self.fonts["tiny"].size(right_text)[0]
+        right_x = screen.get_width() - 28 - right_width
+        draw_text(screen, self.fonts["tiny"], right_text, (right_x, 24), GREEN)
+        pygame.draw.circle(screen, GREEN, (right_x - 14, 31), 3)
+        pygame.draw.line(screen, BODY_EDGE, (28, 78), (screen.get_width() - 28, 78), 1)
 
     def draw_home(self, screen):
-        draw_text(screen, self.fonts["small"], "VOID SHELL", (34, 25), PURPLE_LIGHT)
-        draw_text(screen, self.fonts["heading"], "HOME", (34, 50))
-        draw_text(screen, self.fonts["tiny"], "LOCAL MODE", (650, 30), GREEN)
-        pygame.draw.line(screen, BODY_EDGE, (34, 96), (746, 96), 1)
+        self.draw_header(screen, "LOCAL", "HOME")
         for index, label in enumerate(MENU_ITEMS):
-            y = 116 + index * 48
+            y = 94 + index * 47
             selected = index == self.selected_index
-            rect = pygame.Rect(34, y, 438, 38)
+            rect = pygame.Rect(28, y, 500, 38)
             if selected:
                 pygame.draw.rect(screen, PURPLE_DARK, rect)
                 pygame.draw.rect(screen, PURPLE, rect, 1)
-                pygame.draw.polygon(screen, PURPLE_LIGHT, [(rect.x + 12, y + 12), (rect.x + 20, y + 19), (rect.x + 12, y + 26)])
-            draw_text(screen, self.fonts["body"], label, (68, y + 7), WHITE if selected else MUTED)
+                pygame.draw.polygon(screen, PURPLE_LIGHT, [(41, y + 12), (49, y + 19), (41, y + 26)])
+            draw_text(screen, self.fonts["tiny"], f"0{index + 1}", (61, y + 12), PURPLE_LIGHT if selected else MUTED)
+            draw_text(screen, self.fonts["body"], label, (102, y + 7), WHITE if selected else MUTED)
+            description = ("1 INSTALLED", "3 ADAPTERS", "LOCAL LINK", "2 ITEMS", "3 OPTIONS")[index]
+            draw_text(screen, self.fonts["tiny"], description, (399, y + 12), WHITE if selected else MUTED)
 
-        status = pygame.Rect(500, 116, 246, 230)
+        status = pygame.Rect(552, 94, 280, 225)
         draw_panel(screen, status)
-        draw_text(screen, self.fonts["tiny"], "SYSTEM STATUS", (520, 134), PURPLE_LIGHT)
-        for row, (label, value) in enumerate((("PROFILE", "LOCAL"), ("NETWORK", "OFFLINE"), ("NODE", "NONE"), ("BUILD", "0.1"))):
-            y = 174 + row * 34
-            draw_text(screen, self.fonts["tiny"], label, (520, y), MUTED)
-            draw_text(screen, self.fonts["tiny"], value, (632, y), WHITE)
-        draw_text(screen, self.fonts["tiny"], "ENTER  SELECT", (520, 318), MUTED)
+        draw_text(screen, self.fonts["tiny"], "DEVICE PULSE", (570, 110), PURPLE_LIGHT)
+        status_rows = (
+            (("PROFILE", "NYX-01"), ("NETWORK", "LOCAL"), ("NODE", "STANDBY"), ("BATTERY", "SIM 86%"), ("BUILD", "0.2"))
+            if self.settings["STATUS DETAIL"]
+            else (("PROFILE", "NYX-01"), ("SYSTEM", "READY"), ("BUILD", "0.2"))
+        )
+        for row, (label, value) in enumerate(status_rows):
+            self.draw_status_row(screen, label, value, 570, 143 + row * 29)
+        draw_meter(screen, pygame.Rect(570, 291, 244, 10), 0.86, GREEN)
+
+        self.draw_footer(screen, "UP/DOWN  NAVIGATE", "ENTER  OPEN", "Q  POWER")
+
+    def draw_status_row(self, screen, label, value, x, y):
+        draw_text(screen, self.fonts["tiny"], label, (x, y), MUTED)
+        value_width = self.fonts["tiny"].size(value)[0]
+        draw_text(screen, self.fonts["tiny"], value, (x + 244 - value_width, y), WHITE)
+
+    def draw_footer(self, screen, left, middle, right):
+        pygame.draw.line(screen, BODY_EDGE, (28, 342), (screen.get_width() - 28, 342), 1)
+        draw_text(screen, self.fonts["tiny"], left, (28, 355), MUTED)
+        draw_text(screen, self.fonts["tiny"], middle, (screen.get_width() // 2, 355), PURPLE_LIGHT, center=True)
+        right_width = self.fonts["tiny"].size(right)[0]
+        draw_text(screen, self.fonts["tiny"], right, (screen.get_width() - 28 - right_width, 355), MUTED)
 
     def draw_module(self, screen):
-        title, description, status = MODULE_COPY[self.page]
-        draw_text(screen, self.fonts["small"], f"VOID SHELL / {self.page}", (34, 25), PURPLE_LIGHT)
-        draw_text(screen, self.fonts["heading"], title, (34, 55))
-        pygame.draw.line(screen, BODY_EDGE, (34, 103), (746, 103), 1)
-        panel = pygame.Rect(34, 128, 712, 178)
-        draw_panel(screen, panel)
-        draw_text(screen, self.fonts["body"], description, (58, 158))
-        draw_text(screen, self.fonts["small"], status, (58, 204), MUTED)
-        pygame.draw.line(screen, PURPLE_DARK, (58, 248), (722, 248), 1)
-        draw_text(screen, self.fonts["tiny"], "MODULE CONNECTION READY FOR FUTURE IMPLEMENTATION", (58, 268), PURPLE_LIGHT)
-        draw_text(screen, self.fonts["small"], "ESC / BACKSPACE  RETURN HOME", (34, 337), MUTED)
+        title_map = {
+            "GAMES": "GAME LIBRARY",
+            "EMULATORS": "EMULATOR BAY",
+            "FRIENDS": "FRIEND LINK",
+            "TRADING": "TRADE TERMINAL",
+            "SETTINGS": "SYSTEM SETTINGS",
+        }
+        right_map = {
+            "GAMES": "1 READY",
+            "EMULATORS": "3 ADAPTERS",
+            "FRIENDS": "LOCAL ONLY",
+            "TRADING": "SAFE MODE",
+            "SETTINGS": "LIVE CONFIG",
+        }
+        self.draw_header(screen, self.page, title_map[self.page], right_map[self.page])
+
+        if self.page == "GAMES":
+            rows = tuple((game.title, game.genre, game.status) for game in GAME_LIBRARY)
+            headings = ("TITLE", "TYPE", "STATE")
+        elif self.page == "EMULATORS":
+            rows = tuple((name, "ADAPTER", status) for name, status in EMULATOR_SYSTEMS)
+            headings = ("SYSTEM", "MODE", "STATE")
+        elif self.page == "FRIENDS":
+            rows = FRIEND_SLOTS
+            headings = ("LINK", "IDENTITY", "STATE")
+        elif self.page == "TRADING":
+            rows = TRADE_ITEMS
+            headings = ("ITEM", "QTY", "CLASS")
+        else:
+            rows = tuple((label, "OPTION", "ON" if self.settings[label] else "OFF") for label in SETTING_LABELS)
+            headings = ("SETTING", "TYPE", "VALUE")
+
+        draw_text(screen, self.fonts["tiny"], headings[0], (48, 99), MUTED)
+        draw_text(screen, self.fonts["tiny"], headings[1], (445, 99), MUTED)
+        draw_text(screen, self.fonts["tiny"], headings[2], (640, 99), MUTED)
+        for index, row in enumerate(rows):
+            self.draw_module_row(screen, index, row)
+
+        hint = "ENTER  LAUNCH" if self.page == "GAMES" else "ENTER  ACTION"
+        if self.page == "SETTINGS":
+            hint = "LEFT/RIGHT/ENTER  TOGGLE"
+        self.draw_footer(screen, "UP/DOWN  SELECT", hint, "ESC  HOME")
+        if self.toast_timer > 0:
+            self.draw_toast(screen)
+
+    def draw_module_row(self, screen, index, row):
+        y = 121 + index * 65
+        selected = index == self.module_index
+        rect = pygame.Rect(28, y, 804, 52)
+        pygame.draw.rect(screen, PURPLE_DARK if selected else PANEL, rect)
+        pygame.draw.rect(screen, PURPLE if selected else BODY_EDGE, rect, 1)
+        if selected:
+            pygame.draw.rect(screen, PURPLE_LIGHT, (28, y, 4, 52))
+        draw_text(screen, self.fonts["body"], row[0], (48, y + 7), WHITE if selected else MUTED)
+        draw_text(screen, self.fonts["tiny"], f"ENTRY 0{index + 1}", (48, y + 32), PURPLE_LIGHT if selected else MUTED)
+        draw_text(screen, self.fonts["small"], str(row[1]), (445, y + 15), WHITE if selected else MUTED)
+        state_color = GREEN if row[2] in ("READY", "ONLINE", "ON", "ADAPTER READY") else PURPLE_LIGHT
+        draw_text(screen, self.fonts["tiny"], str(row[2]), (640, y + 18), state_color if selected else MUTED)
+
+    def draw_toast(self, screen):
+        width = min(520, self.fonts["tiny"].size(self.toast)[0] + 42)
+        rect = pygame.Rect((screen.get_width() - width) // 2, 311, width, 28)
+        pygame.draw.rect(screen, (31, 20, 48), rect)
+        pygame.draw.rect(screen, PURPLE, rect, 1)
+        draw_text(screen, self.fonts["tiny"], self.toast, rect.center, PURPLE_LIGHT, center=True)
+
+    def draw_signal_catch(self, screen):
+        self.draw_header(screen, "GAMES / SIGNAL CATCH", "SIGNAL CATCH", f"SCORE {self.game_score:02d}")
+        arena = pygame.Rect(28, 94, 804, 235)
+        draw_panel(screen, arena, fill=(9, 10, 16), accent=PURPLE_DARK)
+        for x in range(arena.left + 40, arena.right, 80):
+            pygame.draw.line(screen, (19, 20, 30), (x, arena.top + 1), (x, arena.bottom - 1), 1)
+        for y in range(arena.top + 40, arena.bottom, 40):
+            pygame.draw.line(screen, (19, 20, 30), (arena.left + 1, y), (arena.right - 1, y), 1)
+
+        pulse = 7 + int(math.sin(time.monotonic() * 7) * 2)
+        pygame.draw.circle(screen, PURPLE_DARK, (int(self.game_orb_x), int(self.game_orb_y)), pulse + 7)
+        pygame.draw.circle(screen, PURPLE_LIGHT, (int(self.game_orb_x), int(self.game_orb_y)), pulse)
+        player = pygame.Rect(self.game_player_x - 52, 296, 104, 14)
+        pygame.draw.polygon(screen, PURPLE, [(player.left, player.bottom), (player.left + 14, player.top), (player.right - 14, player.top), (player.right, player.bottom)])
+        pygame.draw.line(screen, PURPLE_LIGHT, (player.left + 18, player.top), (player.right - 18, player.top), 2)
+        draw_text(screen, self.fonts["tiny"], f"LOST {self.game_misses:02d}", (48, 305), MUTED)
+        self.draw_footer(screen, "LEFT/RIGHT  MOVE", "CAPTURE THE SIGNAL", "ESC  LIBRARY")
+        if self.toast_timer > 0:
+            self.draw_toast(screen)
+
+    def draw_bottom_context(self, screen, elapsed):
+        if self.page == "SIGNAL CATCH":
+            self.draw_game_context(screen)
+        elif self.page == "SETTINGS":
+            self.draw_settings_context(screen)
+        else:
+            self.draw_voidling_screen(screen, elapsed)
 
     def draw_voidling_screen(self, screen, elapsed):
-        draw_text(screen, self.fonts["tiny"], "VOIDLING // COMPANION LINK", (18, 14), PURPLE_LIGHT)
+        section = "HOME" if self.page == "HOME" else self.page
+        draw_text(screen, self.fonts["tiny"], f"VOIDLING // {section} CONTEXT", (18, 14), PURPLE_LIGHT)
         pygame.draw.line(screen, BODY_EDGE, (18, 36), (372, 36), 1)
 
-        bob = int(math.sin(elapsed * 2.3) * 4)
+        bob = int(math.sin(elapsed * 2.3) * 4) if self.settings["ANIMATIONS"] else 0
         center = (91, 112 + bob)
         pygame.draw.ellipse(screen, (30, 18, 48), (42, 165, 100, 14))
         outer = [
@@ -191,18 +409,55 @@ class VoidFlipApp:
         pygame.draw.circle(screen, PURPLE_LIGHT, (center[0] + 13, center[1] - 4), 4)
         pygame.draw.arc(screen, PURPLE_LIGHT, (center[0] - 10, center[1] + 1, 20, 14), 0.15, math.pi - 0.15, 2)
 
-        draw_text(screen, self.fonts["body"], self.voidling.name.upper(), (162, 52))
-        draw_text(screen, self.fonts["tiny"], f"LV {self.voidling.level:02d}  //  {self.voidling.mood}", (163, 82), MUTED)
-        draw_text(screen, self.fonts["tiny"], "XP", (163, 112), MUTED)
-        draw_meter(screen, pygame.Rect(200, 113, 160, 12), self.voidling.xp_progress)
-        draw_text(screen, self.fonts["tiny"], "EN", (163, 140), MUTED)
-        draw_meter(screen, pygame.Rect(200, 141, 160, 12), self.voidling.energy_progress, GREEN)
-        draw_text(screen, self.fonts["tiny"], "MINI INVENTORY", (163, 174), PURPLE_LIGHT)
+        draw_text(screen, self.fonts["body"], self.voidling.name.upper(), (162, 50))
+        draw_text(screen, self.fonts["tiny"], f"LV {self.voidling.level:02d}  //  {self.voidling.mood}", (163, 80), MUTED)
+        draw_text(screen, self.fonts["tiny"], "XP", (163, 108), MUTED)
+        draw_meter(screen, pygame.Rect(200, 109, 160, 12), self.voidling.xp_progress)
+        draw_text(screen, self.fonts["tiny"], "EN", (163, 136), MUTED)
+        draw_meter(screen, pygame.Rect(200, 137, 160, 12), self.voidling.energy_progress, GREEN)
+        draw_text(screen, self.fonts["tiny"], "POCKET", (163, 169), PURPLE_LIGHT)
         for row, item in enumerate(self.voidling.inventory[:2]):
-            draw_text(screen, self.fonts["tiny"], f"{item.name} x{item.quantity}", (163, 197 + row * 18), WHITE)
+            draw_text(screen, self.fonts["tiny"], f"{item.name} x{item.quantity}", (163, 192 + row * 18), WHITE)
+
+    def draw_game_context(self, screen):
+        draw_text(screen, self.fonts["tiny"], "GAME // LIVE TELEMETRY", (18, 14), PURPLE_LIGHT)
+        pygame.draw.line(screen, BODY_EDGE, (18, 36), (372, 36), 1)
+        draw_text(screen, self.fonts["heading"], f"{self.game_score:02d}", (70, 90), WHITE, center=True)
+        draw_text(screen, self.fonts["tiny"], "CAPTURED", (34, 119), MUTED)
+        draw_text(screen, self.fonts["heading"], f"{self.game_misses:02d}", (70, 166), PURPLE_LIGHT, center=True)
+        draw_text(screen, self.fonts["tiny"], "SIGNALS LOST", (25, 195), MUTED)
+        draw_panel(screen, pygame.Rect(150, 53, 222, 157))
+        draw_text(screen, self.fonts["small"], "FIELD GUIDE", (168, 70), PURPLE_LIGHT)
+        draw_text(screen, self.fonts["tiny"], "MOVE THE RECEIVER", (168, 106), WHITE)
+        draw_text(screen, self.fonts["tiny"], "UNDER EACH SIGNAL.", (168, 128), WHITE)
+        draw_text(screen, self.fonts["tiny"], "SPEED RISES WITH SCORE.", (168, 158), MUTED)
+        draw_text(screen, self.fonts["tiny"], "D-PAD  <  >", (168, 187), GREEN)
+
+    def draw_settings_context(self, screen):
+        label = SETTING_LABELS[self.module_index]
+        descriptions = {
+            "SCANLINES": ("DISPLAY FILTER", "Adds a subtle CRT-style texture."),
+            "ANIMATIONS": ("MOTION SYSTEM", "Controls lightweight UI motion."),
+            "STATUS DETAIL": ("DETAIL LEVEL", "Shows expanded device telemetry."),
+        }
+        title, description = descriptions[label]
+        draw_text(screen, self.fonts["tiny"], "SETTINGS // LIVE PREVIEW", (18, 14), PURPLE_LIGHT)
+        pygame.draw.line(screen, BODY_EDGE, (18, 36), (372, 36), 1)
+        draw_panel(screen, pygame.Rect(18, 55, 354, 151))
+        draw_text(screen, self.fonts["small"], title, (38, 74), WHITE)
+        draw_text(screen, self.fonts["tiny"], description, (38, 109), MUTED)
+        state = "ENABLED" if self.settings[label] else "DISABLED"
+        draw_text(screen, self.fonts["heading"], state, (195, 155), GREEN if self.settings[label] else PURPLE_LIGHT, center=True)
+        draw_text(screen, self.fonts["tiny"], "ENTER TO TOGGLE", (195, 188), MUTED, center=True)
+
+    @staticmethod
+    def draw_scanlines(screen, spacing=4, alpha=13):
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        for y in range(0, screen.get_height(), spacing):
+            pygame.draw.line(overlay, (0, 0, 0, alpha), (0, y), (screen.get_width(), y))
+        screen.blit(overlay, (0, 0))
 
     def draw_controls(self):
-        # D-pad
         pygame.draw.rect(self.surface, PANEL_LIGHT, (205, 635, 52, 154), border_radius=7)
         pygame.draw.rect(self.surface, PANEL_LIGHT, (154, 686, 154, 52), border_radius=7)
         pygame.draw.rect(self.surface, BODY_EDGE, (205, 635, 52, 154), 2, border_radius=7)

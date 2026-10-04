@@ -1,4 +1,4 @@
-"""Launch Void Flip v0.1 from the repository root with `py flip/src/main.py`."""
+"""Launch Void Flip v0.2 from the repository root with `py flip/src/main.py`."""
 
 import argparse
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Void Flip v0.1 desktop simulator")
+    parser = argparse.ArgumentParser(description="Void Flip v0.2 desktop simulator")
     parser.add_argument("--no-splash", action="store_true", help="skip the startup splash")
     parser.add_argument("--smoke-test", action="store_true", help="run a short headless navigation check")
     parser.add_argument("--screenshot", type=Path, help="save a home-screen screenshot and exit")
@@ -31,12 +31,17 @@ def run_smoke_test():
     app.handle_action("up")
     assert app.selected_index == len(MENU_ITEMS) - 1
     assert app.voidling.name and 0.0 <= app.voidling.xp_progress <= 1.0
+    app.open_page("GAMES")
+    app.handle_action("select")
+    assert app.page == "SIGNAL CATCH"
+    app.handle_action("back")
+    assert app.page == "GAMES"
     app.handle_action("quit")
     assert not app.running
     import pygame
 
     pygame.quit()
-    print("Void Flip smoke test passed: navigation, modules, back, Voidling, and quit state are ready.")
+    print("Void Flip v0.2 smoke test passed: shell, modules, settings, game, Voidling, and quit state are ready.")
 
 
 def main():

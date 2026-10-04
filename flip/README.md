@@ -1,12 +1,14 @@
 # Void Flip
 
-Void Flip is the portable handheld in the Void Ecosystem. Version 0.1 is a runnable desktop simulator for exploring the interface before the physical screens, controls, and Raspberry Pi-class computer are finalized.
+Void Flip is the portable handheld in the Void Ecosystem. Version 0.2 grows the runnable desktop simulator into the first interactive shell while the physical screens, controls, and Raspberry Pi-class computer are still being designed.
 
-## What v0.1 includes
+## What v0.2 includes
 
-- VOID startup splash and lightweight transition
-- Dual-screen clamshell visual with drawn D-pad and A/B/X/Y controls
-- Home menu and working placeholder pages for Games, Emulators, Friends, Trading, and Settings
+- Balanced dual-screen chassis with equal-width top and bottom halves
+- Polished home dashboard and populated Games, Emulators, Friends, Trading, and Settings modules
+- `Signal Catch`, a playable built-in arcade prototype with score and miss tracking
+- Interactive scanline, animation, and status-detail settings
+- Context-aware bottom display for the Voidling, game telemetry, and setting previews
 - Bottom-screen Voidling companion with name, level, XP, energy, mood, mini inventory, and idle animation
 - Keyboard input separated from rendering so hardware input can replace it later
 
@@ -28,12 +30,13 @@ py flip/src/main.py
 | Back | Escape or Backspace | B button |
 | Quit | Q | System shortcut |
 
-On the home screen, Up/Down moves through the menu. Selecting a section opens its module page; Back returns home.
+On the home screen, Up/Down moves through the menu. Module lists also use Up/Down. Select launches the ready game or toggles a setting; Back moves up one level. In Signal Catch, move left and right to catch the falling signal.
 
 ## Source layout
 
 - `src/main.py` — launch entry point and command-line options
 - `src/app.py` — application loop, input mapping, navigation, and screen composition
+- `src/content.py` — library, emulator, friend, trade, and setting content
 - `src/theme.py` — shared colors, typography helpers, panels, and sharp corner accents
 - `src/models.py` — expandable data models for the Voidling and inventory
 - `tests/test_navigation.py` — headless state/navigation checks

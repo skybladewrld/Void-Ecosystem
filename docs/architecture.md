@@ -20,7 +20,7 @@ Node is optional infrastructure. It can provide neutral hosted services where a 
 
 Deck comes later. It may combine portable features with Node services and development tools, but should consume the same documented protocols instead of receiving hidden privileged access.
 
-## Current v0.1 layers
+## Current v0.2 layers
 
 ```text
 Desktop operating system
@@ -32,7 +32,7 @@ Void Flip application state
 Top-display modules + bottom-display Voidling context
 ```
 
-The simulator keeps input handling, state, and drawing conceptually separate. Later, keyboard events can be replaced by GPIO/controller events, while the same interface state and display renderers target physical displays.
+The simulator keeps input handling, state, content data, and drawing conceptually separate. Later, keyboard events can be replaced by GPIO/controller events, while the same interface state and display renderers target physical displays. The built-in Signal Catch game proves that the shell can hand off controls and both displays to an interactive module without introducing a hardware dependency.
 
 The intended hardware direction is:
 

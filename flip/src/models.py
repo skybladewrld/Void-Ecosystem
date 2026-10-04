@@ -11,9 +11,19 @@ class InventoryItem:
     quantity: int = 1
 
 
+@dataclass(frozen=True)
+class GameEntry:
+    """A game shown in the local library."""
+
+    title: str
+    genre: str
+    status: str
+    playable: bool = False
+
+
 @dataclass
 class Voidling:
-    """The v0.1 companion state, kept separate from rendering for future persistence."""
+    """Companion state, kept separate from rendering for future persistence."""
 
     name: str = "Nyx"
     level: int = 3

@@ -1,6 +1,6 @@
 # Void Ecosystem
 
-Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The project is currently in its first software phase: **Void Flip v0.1**.
+Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The project is currently developing **Void Flip v0.2**.
 
 ## The devices
 
@@ -8,11 +8,11 @@ Void Ecosystem is a planned family of portable, local-first devices built around
 - **Void Node** — an optional local server for neutral shared services such as larger multiplayer sessions and validated trading.
 - **Void Deck** — a future cyberdeck-style device combining Flip and Node capabilities with development tools.
 
-## Current phase: Void Flip v0.1
+## Current phase: Void Flip v0.2
 
-The current prototype is a Windows desktop simulator built with Python and Pygame Community Edition (imported as `pygame`). This package has Windows builds for Python 3.14. The simulator models the Flip's clamshell body, non-touch top display, smaller bottom companion display, D-pad, and face buttons. It is deliberately lightweight and hardware-agnostic so the interface can later move to Raspberry Pi-class hardware.
+The current prototype is a Windows desktop simulator built with Python and Pygame Community Edition (imported as `pygame`). This package has Windows builds for Python 3.14. The simulator models the Flip's balanced clamshell body, non-touch top display, smaller bottom companion display, D-pad, and face buttons. It is deliberately lightweight and hardware-agnostic so the interface can later move to Raspberry Pi-class hardware.
 
-![Void Flip v0.1 desktop simulator](docs/void-flip-v0.1.png)
+![Void Flip v0.2 desktop simulator](docs/void-flip-v0.2.png)
 
 ### Install
 
@@ -32,6 +32,6 @@ See [flip/README.md](flip/README.md) for controls and simulator details. Archite
 
 ## Project status
 
-Void Flip v0.1 is an interface foundation, not a finished console or operating system. It does not yet include real games, emulators, accounts, networking, trading, persistent progression, or hardware input drivers.
+Void Flip v0.2 adds a playable built-in arcade prototype, interactive settings, richer module views, and context-aware bottom-screen information. It is still an early simulator, not a finished console or operating system. Emulators, accounts, networking, trusted trading, persistent progression, and hardware input drivers remain future work.
 
 Void credits are fictional in-device currency only. They will never be purchasable with real money or redeemable for real-world value.
