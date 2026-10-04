@@ -24,6 +24,8 @@ Food, medicine, and care items have concrete stat effects and are removed from i
 
 The journal tracks four deterministic achievements. A later milestone can add evolution forms, quests, more recipes, and named discoveries without changing the save boundary.
 
+In v0.2, care, item use, exploration, crafting, games, achievements, daily quests, and the Void Market feed one shared progression loop. Flux remains separate from Void Shards and Prism Seeds: Flux buys Market goods, while materials craft relics.
+
 ## Persistence
 
 The simulator atomically writes a versioned JSON profile to `%APPDATA%\VoidEcosystem\flip-profile.json` on Windows. It saves after meaningful actions, every 30 seconds, and at shutdown. Tests use isolated or disabled storage so development runs do not modify a player's profile.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import uuid
 
 
 class VoidMergeGame:
@@ -28,6 +29,8 @@ class VoidMergeGame:
         self.game_over = False
         self.paused = False
         self.last_gain = 0
+        self.reward_applied = False
+        self.run_id = uuid.uuid4().hex
         self.spawn_tile()
         self.spawn_tile()
 

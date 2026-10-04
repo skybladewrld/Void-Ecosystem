@@ -1,6 +1,6 @@
 # Void Ecosystem
 
-Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The project is currently developing **Void Flip v0.2.1**.
+Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The project is currently developing **Void Flip v0.2 — Core Loop**.
 
 ## The devices
 
@@ -23,10 +23,10 @@ py flip/src/main.py
 
 ## Project status
 
-Void Flip v0.2.1 replaces the throwaway arcade prototype with the first real platform system: a persistent Voidling with changing needs, care cooldowns, usable items, exploration rewards, relic effects, crafting recipes, achievements, XP, levels, and bond progression. Device power now drains and charges in the desktop simulator through the same adapter boundary intended for Raspberry Pi hardware.
+Void Flip v0.2 connects its systems into a persistent play loop. Games award trusted XP, Flux, and materials; daily quests respond to real actions; the Void Market spends Flux; care, items, crafting, achievements, relics, notifications, unlocks, and activity history all feed the same profile.
 
-The first complete built-in game is **Void Merge 2048**, with correct once-per-move merging, scoring, tile spawning, pause/restart controls, win/loss detection, and a persistent high score.
+Two complete games are included: **Void Merge 2048** and **Signal Serpent**. Both report results through a centralized, duplicate-safe reward boundary instead of editing profile currency directly.
 
-The game library is an honest production roadmap, not a menu of fake launch buttons. Each game will be implemented and tested as a complete vertical slice before it is marked playable. See [the game roadmap](docs/game-roadmap.md), [Voidling system design](docs/voidling-system.md), [simulator details](flip/README.md), and [architecture](docs/architecture.md).
+See [the v0.2 release notes](docs/v0.2.md), [game roadmap](docs/game-roadmap.md), [Voidling system design](docs/voidling-system.md), [simulator details](flip/README.md), and [architecture](docs/architecture.md).
 
-Void credits are fictional in-device currency only. They will never be purchasable with real money or redeemable for real-world value.
+Flux is fictional in-device currency only. It cannot be purchased with real money or redeemed for real-world value.

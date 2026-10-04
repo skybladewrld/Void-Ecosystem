@@ -1,8 +1,8 @@
 # Void Flip
 
-Void Flip is the portable handheld in the Void Ecosystem. Version 0.2.1 focuses on making the companion and device simulation real before game production begins.
+Void Flip is the portable handheld in the Void Ecosystem. Version 0.2 connects games, Nyx, quests, crafting, and the Market into one persistent Core Loop.
 
-## What v0.2.1 includes
+## What v0.2 includes
 
 - Balanced dual-screen chassis with equal-width top and bottom halves
 - Persistent Voidling energy, fullness, joy, health, bond, XP, and levels
@@ -13,6 +13,14 @@ Void Flip is the portable handheld in the Void Ecosystem. Version 0.2.1 focuses 
 - Interactive scanline, animation, status-detail, and simulated-charger settings
 - A game-by-game production roadmap that does not label unfinished prototypes as playable
 - Void Merge 2048 with complete board rules, pause, restart, end states, and saved high score
+- Signal Serpent with growth, combos, hazards, speed tiers, shards, and persistent statistics
+- Flux economy and a six-item Void Market with controlled Mystery Cache loot
+- Three date-based daily quests with automatic progress and reward claiming
+- Level-derived module unlocks and advanced-relic gating
+- Centralized, duplicate-safe game rewards with relic modifiers
+- Sliding notifications and a rolling 75-event activity history
+- Contextual lower-screen views for Home, games, quests, Market, Workshop, and Settings
+- Save-schema v2 migration with atomic writes and `.bak` recovery copies
 
 The top display is treated as non-touch. The bottom display is a separate context area so touch input can be added later.
 
@@ -40,8 +48,8 @@ Every normal desktop simulator launch begins at 100%. Later Raspberry Pi hardwar
 | Navigate | Arrow keys or W/A/S/D | D-pad |
 | Select | Enter or Space | A button |
 | Back | Escape or Backspace | B button |
-| Pause | Enter, Space, or P during Void Merge | Start button |
-| Restart | R during Void Merge | Restart shortcut |
+| Pause | Enter, Space, or P during a game | Start button |
+| Restart | R during a game | Restart shortcut |
 | Quit | Q | System shortcut |
 
 Select performs a care action, uses an item, equips a relic, crafts a recipe, or toggles a setting depending on the page. Back moves up one level.
@@ -56,8 +64,10 @@ Progress is saved automatically to `%APPDATA%\VoidEcosystem\flip-profile.json` o
 - `src/models.py` — Voidling simulation and progression rules
 - `src/hardware.py` — simulated telemetry and the future hardware adapter contract
 - `src/games/void_merge.py` — tested Void Merge 2048 rules
+- `src/games/signal_serpent.py` — tested Signal Serpent rules
+- `src/systems/` — economy, quests, rewards, unlocks, notifications, and profile state
 - `src/persistence.py` — versioned atomic local saves
 - `src/theme.py` — shared visual primitives
-- `tests/test_navigation.py` — headless navigation, simulation, save, and rendering checks
+- `tests/` — navigation/rendering plus pure economy, quest, migration, reward, and game-rule tests
 
 The current interface is drawn procedurally and needs no external assets.

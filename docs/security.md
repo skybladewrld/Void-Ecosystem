@@ -1,6 +1,6 @@
 # Security Direction
 
-These requirements guide future design. The v0.1 simulator has no accounts, networking, economy, trading, or persistent progression yet.
+These requirements guide current and future design. v0.2 has local persistence and a fictional Flux economy, but still has no accounts, networking, or active trading.
 
 ## Trust boundaries
 
@@ -14,7 +14,9 @@ These requirements guide future design. The v0.1 simulator has no accounts, netw
 
 - Do not use save-file scrambling or obscurity as a security control.
 - Validate the format, range, origin, and authorization of every trusted-state change.
-- Add authenticated integrity protection to trusted local records when persistence is introduced.
+- The current JSON profile is a local single-player save, not a tamper-proof authority. Add authenticated integrity protection before shared ownership, trading, or competitive rewards exist.
+- Built-in games submit bounded result records to `CoreLoop`; they do not directly award Flux or mutate trusted inventory.
+- Applied game and quest rewards retain rolling IDs so reopening a result screen cannot duplicate a payout.
 - Keep recovery-safe backups and schema versions so interrupted writes and upgrades do not corrupt a profile.
 - Use Node or another authoritative service to validate multiplayer results, trades, and ownership when those features require shared trust.
 - Design trading as an atomic transfer: it must either complete for both parties or complete for neither.
@@ -35,4 +37,4 @@ These requirements guide future design. The v0.1 simulator has no accounts, netw
 
 ## Fictional currency
 
-Void credits or tokens are in-device fiction only. They must never be purchasable with real money or redeemable for money, goods, or other real-world value. Any future card or casino-style minigame must remain fictional, non-purchasable, and non-redeemable.
+Flux and all future Void currencies are in-device fiction only. They must never be purchasable with real money or redeemable for money, goods, or other real-world value. Any future card or casino-style minigame must remain fictional, non-purchasable, and non-redeemable.

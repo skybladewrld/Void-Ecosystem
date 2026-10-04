@@ -1,4 +1,4 @@
-"""Launch Void Flip v0.2.1 from the repository root with `py flip/src/main.py`."""
+"""Launch Void Flip v0.2 Core Loop from the repository root."""
 
 import argparse
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Void Flip v0.2.1 desktop simulator")
+    parser = argparse.ArgumentParser(description="Void Flip v0.2 Core Loop desktop simulator")
     parser.add_argument("--no-splash", action="store_true", help="skip the startup splash")
     parser.add_argument("--smoke-test", action="store_true", help="run a short headless navigation check")
     parser.add_argument("--screenshot", type=Path, help="save a home-screen screenshot and exit")
@@ -30,10 +30,11 @@ def run_smoke_test():
         assert app.page == item
         app.handle_action("back")
         assert app.page == "HOME"
+    app.selected_index = 0
+    app.handle_action("up")
+    assert app.selected_index == 6
     app.handle_action("down")
     assert app.selected_index == 0
-    app.handle_action("up")
-    assert app.selected_index == len(MENU_ITEMS) - 1
     assert app.voidling.name and 0.0 <= app.voidling.xp_progress <= 1.0
     app.open_page("VOIDLING")
     app.handle_action("select")
@@ -49,6 +50,20 @@ def run_smoke_test():
     app.void_merge.board = [[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
     app.handle_action("left")
     assert app.void_merge.score == 4
+    app.handle_action("back")
+    assert app.page == "GAMES"
+    app.open_page("MARKET")
+    before_flux = app.core_profile.flux
+    app.handle_action("select")
+    assert app.core_profile.flux == before_flux - 25
+    app.open_page("SIGNAL SERPENT")
+    head = app.signal_serpent.snake[0]
+    app.signal_serpent.signal = (head[0] + 1, head[1])
+    app.signal_serpent.step()
+    assert app.signal_serpent.score > 0
+    app.handle_action("back")
+    assert app.core_profile.game_stats["signal_serpent_total_runs"] == 1
+    assert len(app.core_profile.quests) == 3
     before_battery = app.hardware.snapshot().battery_percent
     app.hardware.update(80)
     assert app.hardware.snapshot().battery_percent < before_battery
@@ -57,7 +72,7 @@ def run_smoke_test():
     import pygame
 
     pygame.quit()
-    print("Void Flip v0.2.1 smoke test passed: companion loop, hardware telemetry, navigation, and Void Merge are ready.")
+    print("Void Flip v0.2 Core Loop smoke test passed: quests, Market, rewards, both games, companion, and hardware telemetry are connected.")
 
 
 def main():

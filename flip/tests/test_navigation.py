@@ -33,8 +33,12 @@ class NavigationTests(unittest.TestCase):
 
     def test_navigation_wraps(self):
         self.app.handle_action("up")
-        self.assertEqual(self.app.selected_index, len(MENU_ITEMS) - 1)
+        self.assertEqual(self.app.selected_index, 6)
         self.app.handle_action("down")
+        self.assertEqual(self.app.selected_index, 0)
+        self.app.handle_action("left")
+        self.assertEqual(self.app.selected_index, len(MENU_ITEMS) - 1)
+        self.app.handle_action("right")
         self.assertEqual(self.app.selected_index, 0)
 
     def test_voidling_progress_is_bounded(self):
@@ -52,6 +56,20 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(self.app.page, "VOID MERGE 2048")
         self.app.handle_action("back")
         self.assertEqual(self.app.page, "GAMES")
+
+    def test_signal_serpent_launches_at_current_level(self):
+        self.app.open_page("GAMES")
+        self.app.module_index = 1
+        self.app.handle_action("select")
+        self.assertEqual(self.app.page, "SIGNAL SERPENT")
+
+    def test_market_purchase_updates_flux_and_inventory(self):
+        self.app.open_page("MARKET")
+        before_flux = self.app.core_profile.flux
+        before_items = self.app.voidling.inventory.get("spark_fruit", 0)
+        self.app.handle_action("select")
+        self.assertEqual(self.app.core_profile.flux, before_flux - 25)
+        self.assertEqual(self.app.voidling.inventory["spark_fruit"], before_items + 1)
 
     def test_voidling_sections_have_parent_navigation(self):
         self.app.open_page("VOIDLING")
@@ -133,6 +151,8 @@ class NavigationTests(unittest.TestCase):
             self.app.open_page(item)
             self.app.draw_console(1.0)
         self.app.open_page("VOID MERGE 2048")
+        self.app.draw_console(1.0)
+        self.app.open_page("SIGNAL SERPENT")
         self.app.draw_console(1.0)
 
 
