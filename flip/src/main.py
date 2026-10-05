@@ -1,4 +1,4 @@
-"""Launch Void Flip v0.3 Living System from the repository root."""
+"""Launch Void Flip v0.3.1 Depth & Polish from the repository root."""
 
 import argparse
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Void Flip v0.3 Living System desktop simulator")
+    parser = argparse.ArgumentParser(description="Void Flip v0.3.1 Depth & Polish desktop simulator")
     parser.add_argument("--no-splash", action="store_true", help="skip the startup splash")
     parser.add_argument("--smoke-test", action="store_true", help="run a short headless navigation check")
     parser.add_argument("--screenshot", type=Path, help="save a home-screen screenshot and exit")
@@ -35,11 +35,12 @@ def run_smoke_test():
         assert app.page == "HOME"
     app.selected_index = 0
     app.handle_action("up")
-    assert app.selected_index == 6
+    assert app.selected_index == 8
     app.handle_action("down")
     assert app.selected_index == 0
     assert app.voidling.name and 0.0 <= app.voidling.xp_progress <= 1.0
     app.open_page("VOIDLING")
+    app.module_index = 1
     app.handle_action("select")
     assert app.page == "CARE"
     before_actions = app.voidling.total_actions
@@ -49,14 +50,19 @@ def run_smoke_test():
     assert app.page == "VOIDLING"
     app.open_page("GAMES")
     app.handle_action("select")
+    assert app.page == "GAME DETAIL"
+    app.handle_action("select")
     assert app.page == "VOID MERGE 2048"
     app.void_merge.board = [[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
     app.handle_action("left")
     assert app.void_merge.score == 4
     app.handle_action("back")
+    assert app.page == "GAME DETAIL"
+    app.handle_action("back")
     assert app.page == "GAMES"
     app.open_page("MARKET")
     before_flux = app.core_profile.flux
+    app.handle_action("select")
     app.handle_action("select")
     assert app.core_profile.flux == before_flux - 25
     app.open_page("SIGNAL SERPENT")
@@ -83,7 +89,7 @@ def run_smoke_test():
     import pygame
 
     pygame.quit()
-    print("Void Flip v0.3 Living System smoke test passed: Nyx, quests, Codex, mastery, Market, three games, and hardware telemetry are connected.")
+    print("Void Flip v0.3.1 Depth & Polish smoke test passed: layered navigation, confirmations, Nyx tabs, three games, and device controls are connected.")
 
 
 def main():
