@@ -1,6 +1,6 @@
 # Void Ecosystem
 
-Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The project is currently developing **Void Flip v0.2 — Core Loop**.
+Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The current build is **Void Flip v0.3 — Living System**.
 
 ## The devices
 
@@ -12,7 +12,7 @@ Void Ecosystem is a planned family of portable, local-first devices built around
 
 The current Windows desktop simulator uses Python and Pygame Community Edition. It models the Flip's balanced clamshell body, non-touch top display, smaller bottom companion display, D-pad, and face buttons. It stays lightweight and hardware-agnostic so the interface can later move to Raspberry Pi-class hardware.
 
-![Void Flip v0.2 desktop simulator](docs/void-flip-v0.2.png)
+![Void Flip desktop simulator](docs/void-flip-v0.2.png)
 
 From the repository root:
 
@@ -23,10 +23,10 @@ py flip/src/main.py
 
 ## Project status
 
-Void Flip v0.2 connects its systems into a persistent play loop. Games award trusted XP, Flux, and materials; daily quests respond to real actions; the Void Market spends Flux; care, items, crafting, achievements, relics, notifications, unlocks, and activity history all feed the same profile.
+Void Flip v0.3 makes that persistent loop feel alive. Nyx now has contextual behavior, expressions, reactions, and thoughts. Daily and weekly quests, streaks, three game-mastery tracks, twelve one-time challenges, a discovery Codex, 22 achievements, priority notifications, procedural system audio, and a local Profile view all feed one schema-v3 save.
 
-Two complete games are included: **Void Merge 2048** and **Signal Serpent**. Both report results through a centralized, duplicate-safe reward boundary instead of editing profile currency directly.
+Three complete games are included: **Void Merge 2048**, **Signal Serpent**, and **Blackglass Checkers**. Blackglass supports a lightweight Easy/Normal/Hard CPU and reward-free local hot-seat play. Every rewarded game reports results through the centralized, duplicate-safe trust boundary instead of editing profile currency directly.
 
-See [the v0.2 release notes](docs/v0.2.md), [game roadmap](docs/game-roadmap.md), [Voidling system design](docs/voidling-system.md), [simulator details](flip/README.md), and [architecture](docs/architecture.md).
+See [the v0.3 release notes](docs/v0.3.md), [community game API design](docs/game-api.md), [game roadmap](docs/game-roadmap.md), [simulator details](flip/README.md), and [architecture](docs/architecture.md).
 
 Flux is fictional in-device currency only. It cannot be purchased with real money or redeemed for real-world value.

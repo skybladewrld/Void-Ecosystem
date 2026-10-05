@@ -1,8 +1,21 @@
 # Void Flip
 
-Void Flip is the portable handheld in the Void Ecosystem. Version 0.2 connects games, Nyx, quests, crafting, and the Market into one persistent Core Loop.
+Void Flip is the portable handheld in the Void Ecosystem. Version 0.3 deepens its connected progression loop into a Living System.
 
-## What v0.2 includes
+## What v0.3 adds
+
+- Contextual Nyx behavior states, thoughts, blinking, eye movement, sleep motion, and reactions
+- Blackglass Checkers with standard 8x8 movement, forced captures, multi-jumps, kings, terminal states, three CPU difficulties, and local hot-seat play
+- Persistent mastery for all three games and twelve one-time game challenges
+- Two deterministic weekly quests plus forgiving daily-completion streaks
+- Void Codex discovery tracking across items, materials, relics, games, achievements, and mastery badges
+- 22 categorized achievements and a complete local Profile overview
+- Priority notification queue with a bounded 20-entry Notification Center
+- Optional procedural UI audio that safely disables itself when audio hardware is unavailable
+- Hardware Adapter v2 metadata, named input actions, and future Void Link data contracts
+- Save-schema v3 migration that preserves v2 progress
+
+## Existing connected systems
 
 - Balanced dual-screen chassis with equal-width top and bottom halves
 - Persistent Voidling energy, fullness, joy, health, bond, XP, and levels
@@ -20,7 +33,7 @@ Void Flip is the portable handheld in the Void Ecosystem. Version 0.2 connects g
 - Centralized, duplicate-safe game rewards with relic modifiers
 - Sliding notifications and a rolling 75-event activity history
 - Contextual lower-screen views for Home, games, quests, Market, Workshop, and Settings
-- Save-schema v2 migration with atomic writes and `.bak` recovery copies
+- Save-schema v3 migration with atomic writes and `.bak` recovery copies
 
 The top display is treated as non-touch. The bottom display is a separate context area so touch input can be added later.
 
@@ -39,6 +52,8 @@ py flip/src/main.py --battery 0.1 --no-splash
 
 `--battery` accepts any starting percentage from `0` through `100` and overrides the saved charge for that launch.
 
+Use `--scale 0.75` through `--scale 2.0` to resize the desktop window while preserving the logical top/bottom display layout.
+
 Every normal desktop simulator launch begins at 100%. Later Raspberry Pi hardware will replace that temporary assumption with live charge data from a supported fuel-gauge or UPS board through the existing hardware adapter.
 
 ## Controls
@@ -50,6 +65,8 @@ Every normal desktop simulator launch begins at 100%. Later Raspberry Pi hardwar
 | Back | Escape or Backspace | B button |
 | Pause | Enter, Space, or P during a game | Start button |
 | Restart | R during a game | Restart shortcut |
+| Blackglass mode | X | CPU / local hot-seat |
+| Blackglass CPU | Y | Easy / Normal / Hard |
 | Quit | Q | System shortcut |
 
 Select performs a care action, uses an item, equips a relic, crafts a recipe, or toggles a setting depending on the page. Back moves up one level.
@@ -65,7 +82,10 @@ Progress is saved automatically to `%APPDATA%\VoidEcosystem\flip-profile.json` o
 - `src/hardware.py` — simulated telemetry and the future hardware adapter contract
 - `src/games/void_merge.py` — tested Void Merge 2048 rules
 - `src/games/signal_serpent.py` — tested Signal Serpent rules
-- `src/systems/` — economy, quests, rewards, unlocks, notifications, and profile state
+- `src/games/blackglass.py` — pure Checkers rules, game state, and CPU selection
+- `src/systems/` — behavior, Codex, mastery, achievements, quests, rewards, economy, and profile state
+- `src/input.py` / `src/audio.py` — named actions and optional procedural feedback
+- `src/shared/void_link.py` — data-only future networking contracts
 - `src/persistence.py` — versioned atomic local saves
 - `src/theme.py` — shared visual primitives
 - `tests/` — navigation/rendering plus pure economy, quest, migration, reward, and game-rule tests

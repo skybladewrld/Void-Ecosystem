@@ -1,6 +1,6 @@
 # Security Direction
 
-These requirements guide current and future design. v0.2 has local persistence and a fictional Flux economy, but still has no accounts, networking, or active trading.
+These requirements guide current and future design. v0.3 has local persistence and a fictional Flux economy, but still has no accounts, networking, community-code execution, or active trading.
 
 ## Trust boundaries
 
@@ -16,6 +16,7 @@ These requirements guide current and future design. v0.2 has local persistence a
 - Validate the format, range, origin, and authorization of every trusted-state change.
 - The current JSON profile is a local single-player save, not a tamper-proof authority. Add authenticated integrity protection before shared ownership, trading, or competitive rewards exist.
 - Built-in games submit bounded result records to `CoreLoop`; they do not directly award Flux or mutate trusted inventory.
+- Mastery, challenges, quests, Codex entries, achievements, and Blackglass rewards are also resolved by trusted platform systems rather than game modules.
 - Applied game and quest rewards retain rolling IDs so reopening a result screen cannot duplicate a payout.
 - Keep recovery-safe backups and schema versions so interrupted writes and upgrades do not corrupt a profile.
 - Use Node or another authoritative service to validate multiplayer results, trades, and ownership when those features require shared trust.
@@ -31,6 +32,7 @@ These requirements guide current and future design. v0.2 has local persistence a
 ## Community content
 
 - Define a package manifest, permissions, size limits, and compatible API version.
+- The current contract is documentation only; the simulator does not load or execute community packages.
 - Never grant a game raw credentials or unrestricted access to system services.
 - Keep platform updates and trusted code outside community-writable locations.
 - Plan for signed official packages while clearly labeling unsigned community software.

@@ -12,7 +12,7 @@ Each device has a clear job and communicates through documented interfaces. Void
 
 **Void Deck** comes later and should consume the same documented protocols rather than receive hidden privileged access.
 
-## Current v0.2 layers
+## Current v0.3 layers
 
 ```text
 Desktop OS
@@ -26,7 +26,9 @@ Voidling rules/content + top and bottom display renderers
 
 Input mapping, simulation rules, content definitions, persistence, hardware telemetry, and drawing are separate. The `HardwareAdapter` contract lets a Raspberry Pi implementation replace simulated battery and temperature readings without rewriting the shell or Voidling. A future GPIO/controller adapter can feed the same named actions currently produced by keyboard events.
 
-The v0.2 Core Loop adds a trusted systems layer between games and profile state. Built-in games return immutable result records; `CoreLoop` calculates and applies rewards, advances daily quests, records activity, checks level unlocks, and rejects already-claimed run IDs. Economy, quest, reward, progression, notification, and profile logic live under `flip/src/systems/` and remain independent from Pygame rendering.
+The trusted systems layer sits between games and profile state. Built-in games return immutable result records; `CoreLoop` calculates and applies rewards, advances daily and weekly quests, updates mastery and challenges, records discoveries/activity, checks achievements and unlocks, and rejects already-claimed IDs. Game rules remain separate from Pygame rendering.
+
+v0.3 adds named input actions, display metadata, optional audio, and an expanded `HardwareAdapter` snapshot covering battery, charging, temperature, audio availability, network state, display dimensions, and input source. `shared/void_link.py` contains inert serializable concepts for a future transport; it opens no sockets and performs no discovery.
 
 The intended hardware direction is:
 
