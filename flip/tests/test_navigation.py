@@ -33,7 +33,7 @@ class NavigationTests(unittest.TestCase):
 
     def test_navigation_wraps(self):
         self.app.handle_action("up")
-        self.assertEqual(self.app.selected_index, 6)
+        self.assertEqual(self.app.selected_index, 8)
         self.app.handle_action("down")
         self.assertEqual(self.app.selected_index, 0)
         self.app.handle_action("left")
@@ -53,7 +53,11 @@ class NavigationTests(unittest.TestCase):
     def test_first_complete_game_launches_and_returns_to_library(self):
         self.app.open_page("GAMES")
         self.app.handle_action("select")
+        self.assertEqual(self.app.page, "GAME DETAIL")
+        self.app.handle_action("select")
         self.assertEqual(self.app.page, "VOID MERGE 2048")
+        self.app.handle_action("back")
+        self.assertEqual(self.app.page, "GAME DETAIL")
         self.app.handle_action("back")
         self.assertEqual(self.app.page, "GAMES")
 
@@ -61,11 +65,13 @@ class NavigationTests(unittest.TestCase):
         self.app.open_page("GAMES")
         self.app.module_index = 1
         self.app.handle_action("select")
+        self.app.handle_action("select")
         self.assertEqual(self.app.page, "SIGNAL SERPENT")
 
     def test_blackglass_launches_as_third_playable_game(self):
         self.app.open_page("GAMES")
         self.app.module_index = 2
+        self.app.handle_action("select")
         self.app.handle_action("select")
         self.assertEqual(self.app.page, "BLACKGLASS CHECKERS")
         self.app.draw_console(1.0)
@@ -79,6 +85,7 @@ class NavigationTests(unittest.TestCase):
         self.app.open_page("MARKET")
         before_flux = self.app.core_profile.flux
         before_items = self.app.voidling.inventory.get("spark_fruit", 0)
+        self.app.handle_action("select")
         self.app.handle_action("select")
         self.assertEqual(self.app.core_profile.flux, before_flux - 25)
         self.assertEqual(self.app.voidling.inventory["spark_fruit"], before_items + 1)
