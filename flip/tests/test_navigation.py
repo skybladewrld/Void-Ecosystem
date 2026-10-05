@@ -63,6 +63,18 @@ class NavigationTests(unittest.TestCase):
         self.app.handle_action("select")
         self.assertEqual(self.app.page, "SIGNAL SERPENT")
 
+    def test_blackglass_launches_as_third_playable_game(self):
+        self.app.open_page("GAMES")
+        self.app.module_index = 2
+        self.app.handle_action("select")
+        self.assertEqual(self.app.page, "BLACKGLASS CHECKERS")
+        self.app.draw_console(1.0)
+
+    def test_scaled_window_preserves_logical_canvas(self):
+        app = VoidFlipApp(show_splash=False, persist=False, window_scale=0.5)
+        self.assertEqual(app.surface.get_size(), (1200, 900))
+        self.assertEqual(app.window.get_size(), (600, 450))
+
     def test_market_purchase_updates_flux_and_inventory(self):
         self.app.open_page("MARKET")
         before_flux = self.app.core_profile.flux
