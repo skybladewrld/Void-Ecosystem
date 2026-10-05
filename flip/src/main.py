@@ -1,4 +1,4 @@
-"""Launch Void Flip v0.2 Core Loop from the repository root."""
+"""Launch Void Flip v0.3 Living System from the repository root."""
 
 import argparse
 import os
@@ -6,14 +6,17 @@ from pathlib import Path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Void Flip v0.2 Core Loop desktop simulator")
+    parser = argparse.ArgumentParser(description="Void Flip v0.3 Living System desktop simulator")
     parser.add_argument("--no-splash", action="store_true", help="skip the startup splash")
     parser.add_argument("--smoke-test", action="store_true", help="run a short headless navigation check")
     parser.add_argument("--screenshot", type=Path, help="save a home-screen screenshot and exit")
     parser.add_argument("--battery", type=float, metavar="PERCENT", help="override the starting battery from 0 to 100")
+    parser.add_argument("--scale", type=float, default=1.0, help="simulator window scale from 0.5 to 2.0")
     args = parser.parse_args()
     if args.battery is not None and not 0 <= args.battery <= 100:
         parser.error("--battery must be between 0 and 100")
+    if not 0.5 <= args.scale <= 2.0:
+        parser.error("--scale must be between 0.5 and 2.0")
     return args
 
 
@@ -63,7 +66,15 @@ def run_smoke_test():
     assert app.signal_serpent.score > 0
     app.handle_action("back")
     assert app.core_profile.game_stats["signal_serpent_total_runs"] == 1
+    app.open_page("BLACKGLASS CHECKERS")
+    app.blackglass.board = [["." for _ in range(8)] for _ in range(8)]
+    app.blackglass.board[2][1], app.blackglass.board[3][2] = "b", "w"
+    app.blackglass.play(app.blackglass.moves_from((2, 1))[0])
+    assert app.blackglass.game_over and app.blackglass.winner == "black"
+    app.finalize_blackglass()
+    assert app.core_profile.game_stats["blackglass_wins"] == 1
     assert len(app.core_profile.quests) == 3
+    assert len(app.core_profile.weekly_quests) == 2
     before_battery = app.hardware.snapshot().battery_percent
     app.hardware.update(80)
     assert app.hardware.snapshot().battery_percent < before_battery
@@ -72,7 +83,7 @@ def run_smoke_test():
     import pygame
 
     pygame.quit()
-    print("Void Flip v0.2 Core Loop smoke test passed: quests, Market, rewards, both games, companion, and hardware telemetry are connected.")
+    print("Void Flip v0.3 Living System smoke test passed: Nyx, quests, Codex, mastery, Market, three games, and hardware telemetry are connected.")
 
 
 def main():
@@ -88,6 +99,7 @@ def main():
     app = VoidFlipApp(
         show_splash=not args.no_splash and args.screenshot is None,
         battery_percent=args.battery,
+        window_scale=args.scale,
     )
     if args.screenshot:
         app.run(max_frames=2, screenshot=args.screenshot.resolve())

@@ -31,7 +31,7 @@ class GameResult:
     reward_id: str
     game_id: str
     score: int
-    metrics: dict[str, int] = field(default_factory=dict)
+    metrics: dict[str, int | str | bool] = field(default_factory=dict)
 
 
 def game_reward(result: GameResult, relic: RelicDefinition | None = None) -> RewardBundle:
@@ -56,6 +56,16 @@ def game_reward(result: GameResult, relic: RelicDefinition | None = None) -> Rew
             items["void_shard"] = shards
         if score >= 600:
             items["prism_seed"] = 1
+    elif result.game_id == "blackglass":
+        won = bool(result.metrics.get("won", 0))
+        difficulty = str(result.metrics.get("difficulty", "NORMAL"))
+        captures = min(12, max(0, int(result.metrics.get("captures", 0))))
+        difficulty_bonus = {"EASY": 0, "NORMAL": 8, "HARD": 16}.get(difficulty, 0)
+        xp = 4 + captures * 2 + (18 + difficulty_bonus if won else 0)
+        flux = captures + 12 + difficulty_bonus if won else 0
+        bond = 1 if won else 0
+        if won and difficulty == "HARD" and captures >= 6:
+            items["void_shard"] = 1
     else:
         return RewardBundle()
 
@@ -68,7 +78,7 @@ def game_reward(result: GameResult, relic: RelicDefinition | None = None) -> Rew
 
 
 def reward_tier(game_id: str, score: int) -> str:
-    thresholds = (500, 1500, 4000) if game_id == "void_merge" else (100, 300, 700)
+    thresholds = (500, 1500, 4000) if game_id == "void_merge" else (150, 350, 650) if game_id == "blackglass" else (100, 300, 700)
     if score >= thresholds[2]:
         return "VOID"
     if score >= thresholds[1]:

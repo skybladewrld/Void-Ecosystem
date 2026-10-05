@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pygame
 
+from audio import AudioManager
 from content import (
     CARE_ACTIONS,
     EMULATOR_SYSTEMS,
@@ -20,17 +21,24 @@ from content import (
     SETTING_LABELS,
 )
 from hardware import DesktopHardwareAdapter
+from games.blackglass import BlackglassGame, legal_moves
 from games.void_merge import VoidMergeGame
 from games.signal_serpent import SignalSerpentGame
+from input import Action, keyboard_action
 from models import Voidling
 from persistence import ProfileStore
 from systems.core_loop import CoreLoop
+from systems.achievements import ACHIEVEMENTS
+from systems.behavior import NyxBehavior
+from systems.codex import completion, discover
 from systems.economy import MARKET_STOCK
 from systems.notifications import NotificationCenter
+from systems.mastery import CHALLENGES, GAME_TITLES, level_for_xp, progress_for_xp
 from systems.profile import CoreProfile
 from systems.progression import UNLOCK_LEVELS, is_unlocked
 from systems.quests import QUESTS_BY_ID
 from systems.rewards import GameResult, game_reward, reward_tier
+from systems.weekly import WEEKLY_BY_ID
 from theme import (
     BLACK, BODY, BODY_EDGE, GREEN, MUTED, PANEL, PANEL_LIGHT, PURPLE,
     PURPLE_DARK, PURPLE_LIGHT, SCREEN, WHITE, draw_meter, draw_panel,
@@ -46,7 +54,7 @@ BOTTOM_BODY = pygame.Rect(CHASSIS_LEFT, 520, CHASSIS_WIDTH, 342)
 TOP_SCREEN = pygame.Rect(170, 78, 860, 386)
 BOTTOM_SCREEN = pygame.Rect(405, 572, 390, 242)
 MENU_ITEMS = ("GAMES", "VOIDLING", "QUESTS", "MARKET", "WORKSHOP", "FRIENDS", "TRADING", "EMULATORS", "SETTINGS")
-VOIDLING_SECTIONS = ("CARE", "INVENTORY", "RELICS", "WORKSHOP", "JOURNAL")
+VOIDLING_SECTIONS = ("CARE", "INVENTORY", "RELICS", "WORKSHOP", "MASTERY", "CHALLENGES", "CODEX", "PROFILE", "JOURNAL", "NOTIFICATIONS")
 PAGE_PARENTS = {
     "VOIDLING": "HOME",
     "CARE": "VOIDLING",
@@ -54,6 +62,11 @@ PAGE_PARENTS = {
     "RELICS": "VOIDLING",
     "WORKSHOP": "VOIDLING",
     "JOURNAL": "VOIDLING",
+    "MASTERY": "VOIDLING",
+    "CHALLENGES": "VOIDLING",
+    "CODEX": "VOIDLING",
+    "PROFILE": "VOIDLING",
+    "NOTIFICATIONS": "VOIDLING",
     "GAMES": "HOME",
     "QUESTS": "HOME",
     "MARKET": "HOME",
@@ -63,6 +76,7 @@ PAGE_PARENTS = {
     "SETTINGS": "HOME",
     "VOID MERGE 2048": "GAMES",
     "SIGNAL SERPENT": "GAMES",
+    "BLACKGLASS CHECKERS": "GAMES",
 }
 
 
@@ -81,10 +95,12 @@ def fit_text(font, value, max_width):
 class VoidFlipApp:
     """Hardware-agnostic interface with trusted, persistent companion state."""
 
-    def __init__(self, *, show_splash=True, persist=True, save_path=None, battery_percent=None):
+    def __init__(self, *, show_splash=True, persist=True, save_path=None, battery_percent=None, window_scale=1.0):
         pygame.init()
-        pygame.display.set_caption("Void Flip v0.2 — Core Loop")
-        self.surface = pygame.display.set_mode(WINDOW_SIZE)
+        pygame.display.set_caption("Void Flip v0.3 — Living System")
+        self.window_scale = max(0.5, min(2.0, float(window_scale)))
+        self.window = pygame.display.set_mode(tuple(round(value * self.window_scale) for value in WINDOW_SIZE))
+        self.surface = pygame.Surface(WINDOW_SIZE)
         self.clock = pygame.time.Clock()
         self.fonts = make_fonts()
         self.running = True
@@ -102,12 +118,14 @@ class VoidFlipApp:
         self.autosave_tick = 0.0
         self.quest_tick = 0.0
         self.low_battery_notified = False
+        self._notification_token = None
 
         self.store = ProfileStore(save_path) if persist else None
         payload = self.store.load() if self.store else {}
         self.settings = {
             "SCANLINES": True,
             "ANIMATIONS": True,
+            "SOUND": True,
             "STATUS DETAIL": True,
             "SIM CHARGER": False,
         }
@@ -117,8 +135,11 @@ class VoidFlipApp:
         self.game_stats = self.core_profile.game_stats
         self.void_merge = VoidMergeGame()
         self.signal_serpent = SignalSerpentGame()
-        self.notifications = NotificationCenter()
+        self.blackglass = BlackglassGame()
+        self.notifications = NotificationCenter(self.core_profile.notification_history)
         self.core = CoreLoop(self.core_profile, self.voidling, self.notifications)
+        self.behavior = NyxBehavior(self.core_profile.behavior)
+        self.audio = AudioManager(pygame)
         initial_battery = 100.0 if battery_percent is None else battery_percent
         self.hardware = DesktopHardwareAdapter(
             battery_percent=float(initial_battery),
@@ -136,6 +157,8 @@ class VoidFlipApp:
         if not self.store:
             return
         self.voidling.last_updated = time.time()
+        self.core_profile.notification_history = self.notifications.history
+        self.core_profile.behavior = self.behavior.to_dict()
         data = {
             "voidling": self.voidling.to_dict(),
             "settings": self.settings,
@@ -146,6 +169,11 @@ class VoidFlipApp:
     def handle_action(self, action):
         """Update state independently of keyboard, GPIO, or touch sources."""
 
+        if self.settings.get("SOUND"):
+            sound = "navigate" if action in ("up", "down", "left", "right") else "back" if action == "back" else "confirm" if action == "select" else None
+            if sound:
+                self.audio.play(sound)
+
         if action == "quit":
             self.save_state()
             self.running = False
@@ -155,6 +183,8 @@ class VoidFlipApp:
                 self.finalize_void_merge()
             elif self.page == "SIGNAL SERPENT":
                 self.finalize_signal_serpent()
+            elif self.page == "BLACKGLASS CHECKERS":
+                self.finalize_blackglass()
             target = self.page_stack.pop() if self.page_stack else PAGE_PARENTS.get(self.page, "HOME")
             self.open_page(target, push=False)
             return
@@ -200,12 +230,15 @@ class VoidFlipApp:
                 self.show_toast(message)
                 if result.success:
                     self.core_profile.add_activity("craft", result.message)
+                    self.core_profile.profile_stats["crafted"] += 1
+                    discover(self.core_profile, "relics", recipe.relic_id)
                     self.core.record_event("craft", 1)
                     self.core.record_event("xp_gained", result.xp_gained)
                     self.core.track_voidling_milestones(old_level, old_bond)
                     self.notifications.push("RELIC CRAFTED", RELICS[recipe.relic_id].name)
+                    self.behavior.react("EXCITED")
                     self.save_state()
-        elif self.page == "JOURNAL":
+        elif self.page in ("JOURNAL", "MASTERY", "CHALLENGES", "CODEX", "PROFILE", "NOTIFICATIONS"):
             self.handle_list_navigation(action, len(self.voidling_rows()))
         elif self.page == "GAMES":
             self.handle_list_navigation(action, len(GAME_LIBRARY))
@@ -218,14 +251,18 @@ class VoidFlipApp:
                         self.open_page("SIGNAL SERPENT")
                     else:
                         self.show_toast(f"LOCKED // LEVEL {UNLOCK_LEVELS['signal_serpent']}")
+                elif game.game_id == "blackglass" and game.playable:
+                    self.open_page("BLACKGLASS CHECKERS")
                 else:
                     self.show_toast(f"{game.title} // DEVELOPMENT QUEUE")
         elif self.page == "VOID MERGE 2048":
             self.handle_void_merge(action)
         elif self.page == "SIGNAL SERPENT":
             self.handle_signal_serpent(action)
+        elif self.page == "BLACKGLASS CHECKERS":
+            self.handle_blackglass(action)
         elif self.page == "QUESTS":
-            self.handle_list_navigation(action, len(self.core_profile.quests))
+            self.handle_list_navigation(action, len(self.all_quests()))
         elif self.page == "MARKET":
             self.handle_list_navigation(action, len(MARKET_STOCK))
             if action == "select":
@@ -233,6 +270,7 @@ class VoidFlipApp:
                     self.show_toast(f"LOCKED // LEVEL {UNLOCK_LEVELS['market']}")
                 else:
                     self.core.purchase(MARKET_STOCK[self.module_index].sku)
+                    self.behavior.react("CURIOUS")
                     self.save_state()
         elif self.page == "SETTINGS":
             self.handle_list_navigation(action, len(SETTING_LABELS))
@@ -255,7 +293,13 @@ class VoidFlipApp:
 
     def handle_home_navigation(self, action):
         columns = 3
-        if action == "left":
+        if action == "x":
+            self.open_page("VOID MERGE 2048")
+        elif action == "y":
+            self.open_page("SIGNAL SERPENT")
+        elif action == "select_menu":
+            self.open_page("BLACKGLASS CHECKERS")
+        elif action == "left":
             self.selected_index = (self.selected_index - 1) % len(MENU_ITEMS)
         elif action == "right":
             self.selected_index = (self.selected_index + 1) % len(MENU_ITEMS)
@@ -300,7 +344,7 @@ class VoidFlipApp:
             reward_id=f"game:void_merge:{game.run_id}",
             game_id="void_merge",
             score=game.score,
-            metrics={"highest_tile": game.highest_tile, "moves": game.moves},
+            metrics={"highest_tile": game.highest_tile, "moves": game.moves, "merges": game.merges},
         )
         applied = self.core.finalize_game(result)
         game.reward_applied = applied
@@ -335,6 +379,7 @@ class VoidFlipApp:
                 "length": game.length,
                 "best_combo": game.best_combo,
                 "shards": game.shards_collected,
+                "speed_tier": game.speed_tier,
             },
         )
         applied = self.core.finalize_game(result)
@@ -342,6 +387,68 @@ class VoidFlipApp:
         if applied:
             self.save_state()
         return applied
+
+    def handle_blackglass(self, action):
+        game = self.blackglass
+        if action in ("up", "down", "left", "right"):
+            dr, dc = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}[action]
+            game.cursor = ((game.cursor[0] + dr) % 8, (game.cursor[1] + dc) % 8)
+        elif action == "select":
+            if game.game_over:
+                self.finalize_blackglass()
+                game.new_game()
+                return
+            options = game.moves_from(game.selected) if game.selected else []
+            move = next((candidate for candidate in options if candidate.end == game.cursor), None)
+            if move:
+                game.play(move)
+                game.cpu_turn()
+            elif game.moves_from(game.cursor):
+                game.selected = game.cursor
+            else:
+                game.selected = None
+        elif action == "x":
+            game.mode = "LOCAL" if game.mode == "CPU" else "CPU"
+            game.new_game()
+            self.show_toast(f"MODE // {game.mode}")
+        elif action == "y":
+            levels = ("EASY", "NORMAL", "HARD")
+            game.difficulty = levels[(levels.index(game.difficulty) + 1) % len(levels)]
+            self.show_toast(f"CPU // {game.difficulty}")
+        elif action in ("pause",):
+            game.paused = not game.paused
+        elif action == "restart":
+            self.finalize_blackglass()
+            game.new_game()
+        if game.game_over:
+            self.finalize_blackglass()
+
+    def finalize_blackglass(self):
+        game = self.blackglass
+        if game.reward_applied or not game.game_over:
+            return False
+        if game.mode == "LOCAL":
+            self.game_stats["blackglass_local_matches"] += 1
+            game.reward_applied = True
+            self.core_profile.add_activity("game", "Blackglass local match complete — no ecosystem reward")
+            self.save_state()
+            return True
+        won = game.winner == "black"
+        score = game.captures["black"] * 40 + game.kings_created["black"] * 30 + (250 if won else 0)
+        result = GameResult(f"game:blackglass:{game.run_id}", "blackglass", score, {
+            "won": int(won), "normal_win": int(won and game.difficulty in ("NORMAL", "HARD")),
+            "king_safe_win": int(won and game.kings_lost["black"] == 0), "captures": game.captures["black"],
+            "kings": game.kings_created["black"], "difficulty": game.difficulty,
+        })
+        applied = self.core.finalize_game(result)
+        game.reward_applied = applied
+        if applied:
+            self.behavior.react("CELEBRATING" if won else "WORRIED")
+            self.save_state()
+        return applied
+
+    def all_quests(self):
+        return self.core_profile.quests + self.core_profile.weekly_quests
 
     def handle_list_navigation(self, action, count, *, home=False):
         attribute = "selected_index" if home else "module_index"
@@ -377,14 +484,18 @@ class VoidFlipApp:
         self.show_toast(message)
         if result.success:
             self.core_profile.add_activity("care", f"{action.title()} with Nyx")
+            self.core_profile.profile_stats["care_actions"] += 1
             self.core.record_event("care_action", 1)
             if action == "EXPLORE":
+                self.core_profile.profile_stats["explores"] += 1
                 self.core.record_event("explore", 1)
             self.core.record_event("xp_gained", result.xp_gained)
             if result.reward_item_id:
+                discover(self.core_profile, "materials" if result.reward_item_id in ("void_shard", "prism_seed") else "items", result.reward_item_id)
                 self.notifications.push("ITEM FOUND", ITEMS[result.reward_item_id].name)
                 self.core_profile.add_activity("item", f"Found {ITEMS[result.reward_item_id].name}")
             self.core.track_voidling_milestones(old_level, old_bond)
+            self.behavior.react("EXCITED" if result.reward_item_id else "HAPPY")
             self.save_state()
 
     def inventory_ids(self):
@@ -421,22 +532,20 @@ class VoidFlipApp:
             return "quit"
         if event.type != pygame.KEYDOWN:
             return None
-        key_actions = {
-            pygame.K_q: "quit",
-            pygame.K_UP: "up", pygame.K_w: "up",
-            pygame.K_DOWN: "down", pygame.K_s: "down",
-            pygame.K_LEFT: "left", pygame.K_a: "left",
-            pygame.K_RIGHT: "right", pygame.K_d: "right",
-            pygame.K_RETURN: "select", pygame.K_SPACE: "select",
-            pygame.K_ESCAPE: "back", pygame.K_BACKSPACE: "back",
-            pygame.K_r: "restart", pygame.K_p: "pause",
-        }
-        return key_actions.get(event.key)
+        action = keyboard_action(event.key, pygame)
+        return action.value if action else None
 
     def update(self, dt):
         self.transition = max(0.0, self.transition - dt * 4.5)
         self.toast_timer = max(0.0, self.toast_timer - dt)
         self.notifications.update(dt)
+        if self.notifications.active:
+            token = (self.notifications.active.title, self.notifications.active.message)
+            if token != self._notification_token and self.settings.get("SOUND"):
+                self.audio.play("important" if self.notifications.active.priority in ("IMPORTANT", "SYSTEM") else "notification")
+            self._notification_token = token
+        else:
+            self._notification_token = None
         self.hardware.update(dt)
         if self.page == "SIGNAL SERPENT":
             was_over = self.signal_serpent.game_over
@@ -451,19 +560,20 @@ class VoidFlipApp:
             self.profile_tick = 0.0
         if self.quest_tick >= 60.0:
             if self.core.refresh_quests():
-                self.notifications.push("DAILY RESET", "NEW OBJECTIVES AVAILABLE")
+                self.notifications.push("QUEST RESET", "NEW OBJECTIVES AVAILABLE", "SYSTEM")
                 self.core_profile.add_activity("quests", "Daily objectives refreshed")
                 self.save_state()
             self.quest_tick = 0.0
         battery = self.hardware.snapshot().battery_percent
         if battery <= 10 and not self.low_battery_notified:
-            self.notifications.push("BATTERY LOW", f"{battery:.1f}% REMAINING")
+            self.notifications.push("BATTERY LOW", f"{battery:.1f}% REMAINING", "SYSTEM")
             self.low_battery_notified = True
         elif battery > 12:
             self.low_battery_notified = False
         if self.autosave_tick >= 30.0:
             self.save_state()
             self.autosave_tick = 0.0
+        self.core_profile.profile_stats["playtime_seconds"] += dt
 
     def draw(self):
         elapsed = time.monotonic() - self.started_at
@@ -472,12 +582,13 @@ class VoidFlipApp:
             self.draw_splash(elapsed / self.splash_duration)
         else:
             self.draw_console(elapsed)
+        pygame.transform.smoothscale(self.surface, self.window.get_size(), self.window)
         pygame.display.flip()
 
     def draw_splash(self, progress):
         glow = int(105 + 55 * math.sin(progress * math.pi))
         draw_text(self.surface, self.fonts["title"], "VOID", (600, 378), (195, glow, 255), center=True)
-        draw_text(self.surface, self.fonts["small"], "COMPANION CORE // BUILD 0.2", (600, 446), MUTED, center=True)
+        draw_text(self.surface, self.fonts["small"], "LIVING SYSTEM // BUILD 0.3", (600, 446), MUTED, center=True)
         bar = pygame.Rect(420, 493, 360, 8)
         pygame.draw.rect(self.surface, (29, 26, 38), bar)
         pygame.draw.rect(self.surface, PURPLE, (bar.x, bar.y, int(bar.width * progress), bar.height))
@@ -494,12 +605,14 @@ class VoidFlipApp:
             self.draw_home(top)
         elif self.page == "VOIDLING":
             self.draw_voidling_hub(top, elapsed)
-        elif self.page in ("CARE", "INVENTORY", "RELICS", "WORKSHOP", "JOURNAL"):
+        elif self.page in VOIDLING_SECTIONS:
             self.draw_voidling_module(top)
         elif self.page == "VOID MERGE 2048":
             self.draw_void_merge(top)
         elif self.page == "SIGNAL SERPENT":
             self.draw_signal_serpent(top)
+        elif self.page == "BLACKGLASS CHECKERS":
+            self.draw_blackglass(top)
         elif self.page == "QUESTS":
             self.draw_quests(top)
         elif self.page == "MARKET":
@@ -533,7 +646,7 @@ class VoidFlipApp:
         pygame.draw.rect(self.surface, (2, 3, 6), BOTTOM_SCREEN.inflate(12, 12), border_radius=4)
         pygame.draw.rect(self.surface, BODY_EDGE, BOTTOM_SCREEN.inflate(12, 12), 2, border_radius=4)
         pygame.draw.circle(self.surface, PURPLE_DARK, (600, 58), 3)
-        draw_text(self.surface, self.fonts["tiny"], "VOID // FLIP 02", (485, 836), MUTED)
+        draw_text(self.surface, self.fonts["tiny"], "VOID // FLIP 03", (485, 836), MUTED)
 
     def draw_header(self, screen, section, title, right_text="SYSTEM READY"):
         draw_text(screen, self.fonts["tiny"], f"VOID SHELL  /  {section}", (28, 18), PURPLE_LIGHT)
@@ -559,8 +672,9 @@ class VoidFlipApp:
 
         today_panel = pygame.Rect(305, 90, 527, 111)
         draw_panel(screen, today_panel)
-        draw_text(screen, self.fonts["tiny"], "TODAY // DAILY OBJECTIVES", (322, 104), PURPLE_LIGHT)
-        for row, quest in enumerate(self.core_profile.quests[:3]):
+        draw_text(screen, self.fonts["tiny"], "TODAY + WEEKLY OBJECTIVES", (322, 104), PURPLE_LIGHT)
+        visible_quests = self.core_profile.quests[:2] + self.core_profile.weekly_quests[:1]
+        for row, quest in enumerate(visible_quests):
             state = "DONE" if quest.get("claimed") else f"{quest.get('progress', 0)}/{quest.get('target', 1)}"
             color = GREEN if quest.get("claimed") else WHITE
             draw_text(screen, self.fonts["tiny"], fit_text(self.fonts["tiny"], quest.get("title", "QUEST"), 270), (322, 129 + row * 22), color)
@@ -569,8 +683,10 @@ class VoidFlipApp:
 
         recent_panel = pygame.Rect(28, 213, 360, 111)
         draw_panel(screen, recent_panel)
-        draw_text(screen, self.fonts["tiny"], "RECENT ACTIVITY", (45, 227), PURPLE_LIGHT)
-        recent = list(reversed(self.core_profile.activity[-3:])) or [{"message": "Core Loop ready"}]
+        draw_text(screen, self.fonts["tiny"], "LIVING SIGNAL", (45, 227), PURPLE_LIGHT)
+        thought = self.behavior.current_thought(self.voidling, "HOME")
+        latest_note = self.notifications.history[-1] if self.notifications.history else {"title": "SYSTEM", "message": "Living System ready"}
+        recent = [{"message": f"NYX: {thought}"}, {"message": f"{latest_note['title']}: {latest_note['message']}"}] + list(reversed(self.core_profile.activity[-1:]))
         for row, event in enumerate(recent):
             draw_text(screen, self.fonts["tiny"], fit_text(self.fonts["tiny"], event.get("message", ""), 320), (45, 254 + row * 22), MUTED if row else WHITE)
 
@@ -587,7 +703,7 @@ class VoidFlipApp:
             pygame.draw.rect(screen, PURPLE if selected else BODY_EDGE, rect, 1)
             text = f"{label} {'LOCK' if locked else ''}".strip()
             draw_text(screen, self.fonts["tiny"], fit_text(self.fonts["tiny"], text, 115), rect.center, WHITE if selected else MUTED, center=True)
-        self.draw_footer(screen, "D-PAD  NAVIGATE", "ENTER  OPEN", "Q  POWER")
+        self.draw_footer(screen, "D-PAD  NAVIGATE", "X/Y/TAB  QUICK PLAY", "Q  POWER")
 
     def draw_voidling_hub(self, screen, elapsed):
         relic = self.current_relic()
@@ -620,8 +736,14 @@ class VoidFlipApp:
         draw_meter(screen, pygame.Rect(x, y + 19, 250, 10), progress, color)
 
     def draw_voidling_module(self, screen):
-        titles = {"CARE": "CARE ROUTINES", "INVENTORY": "PACK INVENTORY", "RELICS": "RELIC MATRIX", "WORKSHOP": "RELIC WORKSHOP", "JOURNAL": "VOIDLING JOURNAL"}
-        right = {"CARE": self.voidling.mood, "INVENTORY": f"{sum(self.voidling.inventory.values())} ITEMS", "RELICS": f"{len(self.voidling.owned_relics)} OWNED", "WORKSHOP": "MATERIAL CRAFTING", "JOURNAL": f"BOND {self.voidling.bond}"}
+        titles = {"CARE": "CARE ROUTINES", "INVENTORY": "PACK INVENTORY", "RELICS": "RELIC MATRIX", "WORKSHOP": "RELIC WORKSHOP",
+                  "MASTERY": "GAME MASTERY", "CHALLENGES": "CHALLENGE MATRIX", "CODEX": "VOID CODEX", "PROFILE": "LOCAL PROFILE",
+                  "JOURNAL": "VOIDLING JOURNAL", "NOTIFICATIONS": "NOTIFICATION CENTER"}
+        right = {"CARE": self.behavior.state(self.voidling), "INVENTORY": f"{sum(self.voidling.inventory.values())} ITEMS",
+                 "RELICS": f"{len(self.voidling.owned_relics)} OWNED", "WORKSHOP": "MATERIAL CRAFTING",
+                 "MASTERY": "THREE SIGNALS", "CHALLENGES": f"{len(self.core_profile.completed_challenges)} COMPLETE",
+                 "CODEX": "DISCOVERY LOG", "PROFILE": self.core_profile.display_name, "JOURNAL": f"BOND {self.voidling.bond}",
+                 "NOTIFICATIONS": f"{len(self.notifications.history)} STORED"}
         self.draw_header(screen, f"VOIDLING / {self.page}", titles[self.page], right[self.page])
         rows = self.voidling_rows()
         self.draw_scrolling_rows(screen, rows, visible=5)
@@ -632,6 +754,8 @@ class VoidFlipApp:
             action = "ENTER  CRAFT"
         if self.page == "JOURNAL":
             action = "PROGRESS RECORD"
+        if self.page in ("MASTERY", "CHALLENGES", "CODEX", "PROFILE", "NOTIFICATIONS"):
+            action = "INSPECT"
         self.draw_footer(screen, "UP/DOWN  SELECT", action, "ESC  VOIDLING")
         if self.toast_timer > 0:
             self.draw_toast(screen)
@@ -657,12 +781,46 @@ class VoidFlipApp:
                 cost = " / ".join(f"{item_id.split('_')[0].upper()} x{quantity}" for item_id, quantity in recipe.ingredients.items())
                 rows.append((relic.name, cost, state))
             return tuple(rows)
-        achievements = (
-            ("FIRST BOND", "COMPLETE" if self.voidling.total_actions >= 1 else "LOCKED", "CARE ONCE"),
-            ("FIELD WALKER", "COMPLETE" if self.voidling.total_actions >= 10 else "LOCKED", "10 ACTIONS"),
-            ("RELIC KEEPER", "COMPLETE" if len(self.voidling.owned_relics) >= 3 else "LOCKED", "3 RELICS"),
-            ("TRUE COMPANION", "COMPLETE" if self.voidling.bond >= 50 else "LOCKED", "BOND 50"),
-        )
+        if self.page == "MASTERY":
+            return tuple((GAME_TITLES[game_id], f"LEVEL {level_for_xp(data.get('xp', 0))}", f"{data.get('xp', 0) % 100}/100 XP")
+                         for game_id, data in self.core_profile.mastery.items())
+        if self.page == "CHALLENGES":
+            return tuple((challenge.title, GAME_TITLES[challenge.game_id], "COMPLETE" if challenge.challenge_id in self.core_profile.completed_challenges else "LOCKED")
+                         for challenge in CHALLENGES)
+        if self.page == "CODEX":
+            rows = []
+            for item_id, item in ITEMS.items():
+                category = "materials" if item_id in ("void_shard", "prism_seed") else "items"
+                found = item_id in self.core_profile.codex.get(category, [])
+                owned = self.voidling.inventory.get(item_id, 0) > 0
+                rows.append((item.name if found else "??? ITEM", category.upper(), "OWNED" if owned else "DISCOVERED" if found else "UNDISCOVERED"))
+            for relic_id, relic in RELICS.items():
+                found = relic_id in self.core_profile.codex.get("relics", [])
+                rows.append((relic.name if found else "??? RELIC", "RELICS", "OWNED" if relic_id in self.voidling.owned_relics else "DISCOVERED" if found else "UNDISCOVERED"))
+            for game_id, title in GAME_TITLES.items():
+                found = game_id in self.core_profile.codex.get("games", [])
+                rows.append((title if found else "??? SIGNAL", "GAMES", "DISCOVERED" if found else "UNDISCOVERED"))
+            for achievement in ACHIEVEMENTS:
+                found = achievement.achievement_id in self.core_profile.completed_achievements
+                rows.append((achievement.title if found else "??? ACHIEVEMENT", achievement.category.upper(), "DISCOVERED" if found else "UNDISCOVERED"))
+            for badge in self.core_profile.codex.get("mastery_badges", []):
+                rows.append((badge.replace(":", " M").replace("_", " ").upper(), "MASTERY BADGES", "OWNED"))
+            return tuple(rows)
+        if self.page == "PROFILE":
+            played = {game_id: data.get("games_played", 0) for game_id, data in self.core_profile.mastery.items()}
+            favorite = GAME_TITLES.get(max(played, key=played.get), "NONE") if played and max(played.values()) else "NONE"
+            totals = {"items": 5, "materials": 2, "relics": len(RELICS), "games": 3, "achievements": len(ACHIEVEMENTS), "mastery_badges": 15}
+            return (("DISPLAY NAME", self.core_profile.display_name, "LOCAL ONLY"), ("NYX", f"LEVEL {self.voidling.level}", f"BOND {self.voidling.bond}"),
+                    ("FLUX", str(self.core_profile.flux), "IN-DEVICE"), ("GAMES PLAYED", str(sum(played.values())), favorite),
+                    ("ACHIEVEMENTS", f"{len(self.core_profile.completed_achievements)}/{len(ACHIEVEMENTS)}", "COMPLETE"),
+                    ("CODEX", f"{completion(self.core_profile, totals) * 100:.0f}%", "DISCOVERED"),
+                    ("STREAK", f"{self.core_profile.current_streak} DAYS", f"BEST {self.core_profile.longest_streak}"),
+                    ("TOP MASTERY", str(max((level_for_xp(data.get('xp', 0)) for data in self.core_profile.mastery.values()), default=1)), "LEVEL"),
+                    ("PLAYTIME", f"{self.core_profile.profile_stats.get('playtime_seconds', 0) / 3600:.1f}H", "LOCAL"))
+        if self.page == "NOTIFICATIONS":
+            return tuple((note.get("title", "NOTICE"), note.get("message", ""), note.get("priority", "INFO"))
+                         for note in reversed(self.notifications.history)) or (("NO NOTIFICATIONS", "SYSTEM QUIET", "INFO"),)
+        achievements = tuple((entry.title, entry.category.upper(), "COMPLETE" if entry.achievement_id in self.core_profile.completed_achievements else "LOCKED") for entry in ACHIEVEMENTS)
         activity_rows = tuple(
             (event.get("message", "EVENT"), event.get("time", "").split("T")[-1], "EVENT")
             for event in reversed(self.core_profile.activity[-8:])
@@ -698,10 +856,11 @@ class VoidFlipApp:
             self.draw_toast(screen)
 
     def draw_quests(self, screen):
-        completed = sum(1 for quest in self.core_profile.quests if quest.get("claimed"))
-        self.draw_header(screen, "CORE / QUESTS", "DAILY SIGNALS", f"{completed}/3 COMPLETE")
+        quests = self.all_quests()
+        completed = sum(1 for quest in quests if quest.get("claimed"))
+        self.draw_header(screen, "CORE / QUESTS", "DAILY + WEEKLY", f"{completed}/{len(quests)} COMPLETE")
         rows = []
-        for quest in self.core_profile.quests:
+        for quest in quests:
             progress = f"{quest.get('progress', 0)}/{quest.get('target', 1)}"
             state = "CLAIMED" if quest.get("claimed") else progress
             rows.append((quest.get("title", "QUEST"), quest.get("description", ""), state))
@@ -718,6 +877,38 @@ class VoidFlipApp:
         self.draw_footer(screen, "UP/DOWN  SELECT", "ENTER  PURCHASE", "ESC  HOME")
         if self.toast_timer > 0:
             self.draw_toast(screen)
+
+    def draw_blackglass(self, screen):
+        game = self.blackglass
+        self.draw_header(screen, "GAMES / BOARD", "BLACKGLASS CHECKERS", f"{game.mode} // {game.difficulty}")
+        size, origin_x, origin_y = 36, 46, 88
+        moves = legal_moves(game.board, game.turn)
+        destinations = {move.end for move in moves if move.start == game.selected}
+        for row in range(8):
+            for col in range(8):
+                rect = pygame.Rect(origin_x + col * size, origin_y + row * size, size, size)
+                pygame.draw.rect(screen, (27, 23, 38) if (row + col) % 2 else (10, 11, 16), rect)
+                if (row, col) == game.cursor:
+                    pygame.draw.rect(screen, GREEN, rect, 2)
+                if (row, col) == game.selected:
+                    pygame.draw.rect(screen, PURPLE_LIGHT, rect, 3)
+                if (row, col) in destinations:
+                    pygame.draw.circle(screen, GREEN, rect.center, 5)
+                piece = game.board[row][col]
+                if piece != ".":
+                    color = PURPLE if piece.lower() == "b" else (190, 196, 214)
+                    pygame.draw.circle(screen, color, rect.center, 13)
+                    pygame.draw.circle(screen, WHITE if piece.isupper() else BODY_EDGE, rect.center, 13, 2)
+                    if piece.isupper():
+                        draw_text(screen, self.fonts["tiny"], "K", rect.center, SCREEN, center=True)
+        draw_panel(screen, pygame.Rect(375, 88, 457, 288))
+        state = "GAME OVER" if game.game_over else "PAUSED" if game.paused else f"{game.turn.upper()} TURN"
+        rows = (("STATE", state), ("BLACK CAPTURES", str(game.captures["black"])), ("WHITE CAPTURES", str(game.captures["white"])),
+                ("LEGAL MOVES", str(len(moves))), ("MODE", game.mode), ("CPU", game.difficulty))
+        for index, (label, value) in enumerate(rows):
+            self.draw_status_row(screen, label, value, 401, 112 + index * 34, width=400)
+        footer = f"WINNER // {game.winner.upper()}" if game.winner else "A SELECT // X MODE // Y CPU // R RESTART"
+        draw_text(screen, self.fonts["tiny"], footer, (603, 338), PURPLE_LIGHT, center=True)
 
     def draw_signal_serpent(self, screen):
         game = self.signal_serpent
@@ -776,8 +967,9 @@ class VoidFlipApp:
         rect = pygame.Rect(screen.get_width() - 350 + slide, 84, 322, 57)
         pygame.draw.rect(screen, (20, 13, 31), rect)
         pygame.draw.rect(screen, PURPLE, rect, 1)
-        pygame.draw.rect(screen, GREEN, (rect.x, rect.y, 4, rect.height))
-        draw_text(screen, self.fonts["tiny"], notification.title, (rect.x + 18, rect.y + 10), GREEN)
+        accent = {"INFO": PURPLE_LIGHT, "REWARD": GREEN, "IMPORTANT": (255, 196, 92), "SYSTEM": (109, 191, 255)}.get(notification.priority, GREEN)
+        pygame.draw.rect(screen, accent, (rect.x, rect.y, 4, rect.height))
+        draw_text(screen, self.fonts["tiny"], f"{notification.priority} // {notification.title}", (rect.x + 18, rect.y + 10), accent)
         draw_text(screen, self.fonts["tiny"], fit_text(self.fonts["tiny"], notification.message, 286), (rect.x + 18, rect.y + 32), WHITE)
 
     def draw_void_merge(self, screen):
@@ -866,12 +1058,14 @@ class VoidFlipApp:
         draw_text(screen, self.fonts["tiny"], self.toast, rect.center, PURPLE_LIGHT, center=True)
 
     def draw_bottom_context(self, screen, elapsed):
-        if self.page in ("CARE", "INVENTORY", "RELICS", "WORKSHOP", "JOURNAL"):
+        if self.page in VOIDLING_SECTIONS:
             self.draw_selected_context(screen)
         elif self.page == "VOID MERGE 2048":
             self.draw_void_merge_context(screen)
         elif self.page == "SIGNAL SERPENT":
             self.draw_signal_serpent_context(screen)
+        elif self.page == "BLACKGLASS CHECKERS":
+            self.draw_blackglass_context(screen)
         elif self.page == "GAMES":
             self.draw_game_menu_context(screen)
         elif self.page == "MARKET":
@@ -908,6 +1102,18 @@ class VoidFlipApp:
         for row, (label, value) in enumerate(rows):
             self.draw_status_row(screen, label, value, 47, 139 + row * 23)
 
+    def draw_blackglass_context(self, screen):
+        game = self.blackglass
+        draw_text(screen, self.fonts["tiny"], "BLACKGLASS // NYX ANALYSIS", (18, 14), PURPLE_LIGHT)
+        pygame.draw.line(screen, BODY_EDGE, (18, 36), (372, 36), 1)
+        draw_panel(screen, pygame.Rect(18, 53, 354, 164))
+        advantage = game.captures["black"] - game.captures["white"]
+        draw_text(screen, self.fonts["heading"], f"{game.turn.upper()} TURN", (195, 79), GREEN, center=True)
+        rows = (("CAPTURE BALANCE", f"{advantage:+d}"), ("BLACK KINGS", str(game.kings_created["black"])),
+                ("MATCH", game.mode), ("NYX", "THINK TWO MOVES AHEAD" if not game.game_over else "GOOD MATCH"))
+        for row, (label, value) in enumerate(rows):
+            self.draw_status_row(screen, label, value, 38, 120 + row * 22, width=314)
+
     def draw_game_menu_context(self, screen):
         game = GAME_LIBRARY[self.module_index]
         draw_text(screen, self.fonts["tiny"], "GAMES // SELECTED", (18, 14), PURPLE_LIGHT)
@@ -920,8 +1126,12 @@ class VoidFlipApp:
             stats = f"HIGH {self.game_stats['void_merge_high_score']} // RUNS {self.game_stats['void_merge_runs']}"
         elif game.game_id == "signal_serpent":
             stats = f"HIGH {self.game_stats['signal_serpent_high_score']} // RUNS {self.game_stats['signal_serpent_total_runs']}"
+        elif game.game_id == "blackglass":
+            stats = f"WINS {self.game_stats['blackglass_wins']} // LOCAL {self.game_stats['blackglass_local_matches']}"
         else:
             stats = "ROADMAP ONLY // NO FAKE LAUNCH"
+        if game.game_id in self.core_profile.mastery:
+            stats += f" // M{level_for_xp(self.core_profile.mastery[game.game_id].get('xp', 0))}"
         draw_text(screen, self.fonts["tiny"], stats, (38, 176), GREEN if game.playable else MUTED)
         rewards = "REWARDS // XP + FLUX + MATERIALS" if game.playable else "STATUS // DESIGN QUEUE"
         draw_text(screen, self.fonts["tiny"], rewards, (38, 199), PURPLE_LIGHT if game.playable else MUTED)
@@ -940,9 +1150,10 @@ class VoidFlipApp:
         draw_text(screen, self.fonts["tiny"], f"BALANCE {self.core_profile.flux} // {state}", (195, 192), GREEN if can_buy else MUTED, center=True)
 
     def draw_quest_context(self, screen):
-        quest = self.core_profile.quests[self.module_index]
-        definition = QUESTS_BY_ID[quest["id"]]
-        draw_text(screen, self.fonts["tiny"], "DAILY SIGNAL // DETAIL", (18, 14), PURPLE_LIGHT)
+        quest = self.all_quests()[self.module_index]
+        weekly = self.module_index >= len(self.core_profile.quests)
+        definition = WEEKLY_BY_ID[quest["id"]] if weekly else QUESTS_BY_ID[quest["id"]]
+        draw_text(screen, self.fonts["tiny"], f"{'WEEKLY' if weekly else 'DAILY'} SIGNAL // DETAIL", (18, 14), PURPLE_LIGHT)
         pygame.draw.line(screen, BODY_EDGE, (18, 36), (372, 36), 1)
         draw_panel(screen, pygame.Rect(18, 53, 354, 164))
         draw_text(screen, self.fonts["small"], quest["title"], (38, 70), WHITE)
@@ -958,7 +1169,8 @@ class VoidFlipApp:
         pygame.draw.line(screen, BODY_EDGE, (18, 36), (372, 36), 1)
         self.draw_voidling_sprite(screen, (91, 113), elapsed)
         draw_text(screen, self.fonts["body"], self.voidling.name.upper(), (162, 50))
-        draw_text(screen, self.fonts["tiny"], f"LV {self.voidling.level:02d} // {self.voidling.mood}", (163, 80), MUTED)
+        state = self.behavior.state(self.voidling)
+        draw_text(screen, self.fonts["tiny"], f"LV {self.voidling.level:02d} // {state}", (163, 80), MUTED)
         stats = (("EN", self.voidling.energy / self.voidling.energy_cap(self.current_relic()), GREEN), ("FULL", self.voidling.fullness / 100, PURPLE), ("JOY", self.voidling.joy / 100, PURPLE_LIGHT))
         for row, (label, progress, color) in enumerate(stats):
             y = 107 + row * 27
@@ -966,11 +1178,14 @@ class VoidFlipApp:
             draw_meter(screen, pygame.Rect(210, y + 1, 150, 11), progress, color)
         relic = self.current_relic()
         draw_text(screen, self.fonts["tiny"], f"BOND {self.voidling.bond} // {relic.name if relic else 'NO RELIC'}", (163, 194), WHITE)
-        status = {"HUNGRY": "Nyx is looking for food.", "TIRED": "Nyx could use a rest cycle.", "LONELY": "Nyx wants some attention.", "THRIVING": "Nyx is ready for anything."}.get(self.voidling.mood, "Nyx is watching the system pulse.")
+        status = self.behavior.current_thought(self.voidling, self.page)
         draw_text(screen, self.fonts["tiny"], fit_text(self.fonts["tiny"], status, 210), (163, 216), PURPLE_LIGHT)
 
     def draw_voidling_sprite(self, screen, center, elapsed, scale=1.0):
-        bob = int(math.sin(elapsed * 2.3) * 4) if self.settings["ANIMATIONS"] else 0
+        state = self.behavior.state(self.voidling)
+        speed = 4.7 if state in ("EXCITED", "CELEBRATING") else 1.4 if state == "SLEEPING" else 2.3
+        amplitude = 7 if state in ("EXCITED", "CELEBRATING") else 2 if state in ("TIRED", "SLEEPING") else 4
+        bob = int(math.sin(elapsed * speed) * amplitude) if self.settings["ANIMATIONS"] else 0
         cx, cy = center[0], center[1] + bob
         w, h = int(42 * scale), int(52 * scale)
         pygame.draw.ellipse(screen, (30, 18, 48), (cx - int(50 * scale), cy + int(53 * scale), int(100 * scale), int(14 * scale)))
@@ -978,9 +1193,18 @@ class VoidFlipApp:
         inner = [(cx, cy - int(42 * scale)), (cx + int(31 * scale), cy - 13), (cx + 23, cy + 29), (cx, cy + 40), (cx - 23, cy + 29), (cx - int(31 * scale), cy - 13)]
         pygame.draw.polygon(screen, PURPLE_DARK, outer)
         pygame.draw.polygon(screen, PURPLE, inner, 2)
-        pygame.draw.circle(screen, PURPLE_LIGHT, (cx - 13, cy - 4), max(3, int(4 * scale)))
-        pygame.draw.circle(screen, PURPLE_LIGHT, (cx + 13, cy - 4), max(3, int(4 * scale)))
-        pygame.draw.arc(screen, PURPLE_LIGHT, (cx - 10, cy + 1, 20, 14), 0.15, math.pi - 0.15, 2)
+        blink = self.settings["ANIMATIONS"] and int(elapsed * 2) % 13 == 0
+        if blink or state == "SLEEPING":
+            pygame.draw.line(screen, PURPLE_LIGHT, (cx - 17, cy - 4), (cx - 9, cy - 4), 2)
+            pygame.draw.line(screen, PURPLE_LIGHT, (cx + 9, cy - 4), (cx + 17, cy - 4), 2)
+        else:
+            look = int(math.sin(elapsed * .7) * 2)
+            pygame.draw.circle(screen, PURPLE_LIGHT, (cx - 13 + look, cy - 4), max(3, int(4 * scale)))
+            pygame.draw.circle(screen, PURPLE_LIGHT, (cx + 13 + look, cy - 4), max(3, int(4 * scale)))
+        if state in ("HAPPY", "EXCITED", "PROUD", "CELEBRATING"):
+            pygame.draw.arc(screen, PURPLE_LIGHT, (cx - 10, cy + 1, 20, 14), math.pi, math.pi * 2, 2)
+        else:
+            pygame.draw.arc(screen, PURPLE_LIGHT, (cx - 10, cy + 5, 20, 12), 0.15, math.pi - 0.15, 2)
 
     def draw_selected_context(self, screen):
         draw_text(screen, self.fonts["tiny"], f"{self.page} // DETAIL", (18, 14), PURPLE_LIGHT)
@@ -1016,6 +1240,7 @@ class VoidFlipApp:
         descriptions = {
             "SCANLINES": "Subtle display texture.",
             "ANIMATIONS": "Lightweight companion motion.",
+            "SOUND": "Procedural UI and game feedback.",
             "STATUS DETAIL": "Expanded device telemetry.",
             "SIM CHARGER": "Desktop-only charging source.",
         }

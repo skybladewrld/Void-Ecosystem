@@ -15,6 +15,7 @@ class VoidMergeGame:
         self.board: list[list[int]] = []
         self.score = 0
         self.moves = 0
+        self.merges = 0
         self.won = False
         self.game_over = False
         self.paused = False
@@ -25,6 +26,7 @@ class VoidMergeGame:
         self.board = [[0 for _ in range(self.size)] for _ in range(self.size)]
         self.score = 0
         self.moves = 0
+        self.merges = 0
         self.won = False
         self.game_over = False
         self.paused = False
@@ -102,6 +104,8 @@ class VoidMergeGame:
             return False
 
         self.score += total_gain
+        if total_gain:
+            self.merges += 1
         self.last_gain = total_gain
         self.moves += 1
         self.won = self.won or any(value >= self.target for row in self.board for value in row)

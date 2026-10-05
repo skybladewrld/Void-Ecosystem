@@ -50,11 +50,11 @@ EXPLORE_REWARDS = ("spark_fruit", "moon_biscuit", "starlight_tea", "void_shard",
 GAME_LIBRARY = (
     GameEntry("merge_2048", "VOID MERGE 2048", "PUZZLE", "PLAYABLE", "Merge matching values, plan the grid, and reach the 2048 core.", playable=True),
     GameEntry("signal_serpent", "SIGNAL SERPENT", "ARCADE", "PLAYABLE", "Fast grid survival with combos, signal shards, and rising speed.", playable=True),
+    GameEntry("blackglass", "BLACKGLASS CHECKERS", "BOARD", "PLAYABLE", "Forced captures, multi-jumps, kings, CPU, and local hot-seat play.", "1-2P", True),
     GameEntry("maze_shift", "MAZE SHIFT", "MAZE CHASE", "DESIGN", "Original shifting-maze chase with Voidling rescue objectives."),
     GameEntry("starfall_wing", "STARFALL WING", "SPACE SHOOTER", "DESIGN", "Formation shooter with upgrade routes and boss patterns."),
     GameEntry("void_garden", "VOID GARDEN", "AFK", "PLANNED", "Offline resource ecology tied to careful return visits."),
     GameEntry("relay_forge", "RELAY FORGE", "CLICKER", "PLANNED", "Combo-driven crafting instead of empty number inflation."),
-    GameEntry("blackglass", "BLACKGLASS CHECKERS", "BOARD", "PLANNED", "Full checkers with local AI and two-player play.", "1-2P"),
     GameEntry("constellation", "CONSTELLATION HOP", "BOARD", "PLANNED", "Chinese-checkers-inspired multiplayer for direct links.", "2-6P"),
     GameEntry("void_party", "VOID PARTY", "PARTY", "PLANNED", "A rotating collection of local multiplayer challenges.", "2-4P"),
     GameEntry("community", "COMMUNITY GAMES", "PLATFORM", "PLANNED", "Permissioned packages with clear trust labels.", "VARIES"),
@@ -73,4 +73,4 @@ FRIEND_SLOTS = (
     ("VOID NODE", "NOT PAIRED", "OFFLINE"),
 )
 
-SETTING_LABELS = ("SCANLINES", "ANIMATIONS", "STATUS DETAIL", "SIM CHARGER")
+SETTING_LABELS = ("SCANLINES", "ANIMATIONS", "SOUND", "STATUS DETAIL", "SIM CHARGER")
