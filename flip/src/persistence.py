@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 
-SAVE_VERSION = 2
+SAVE_VERSION = 3
 
 
 def migrate_payload(payload: dict) -> dict:
@@ -27,6 +27,19 @@ def migrate_payload(payload: dict) -> dict:
             "seen_unlocks": [],
             "claimed_rewards": [],
         })
+    if version < 3:
+        if not isinstance(migrated.get("core"), dict):
+            migrated["core"] = {}
+        core = migrated["core"]
+        defaults = {
+            "weekly_key": "", "weekly_quests": [], "current_streak": 0,
+            "longest_streak": 0, "last_daily_completion": "", "mastery": {},
+            "completed_challenges": [], "codex": {}, "completed_achievements": [],
+            "notification_history": [], "profile_stats": {}, "behavior": {},
+            "display_name": "PLAYER",
+        }
+        for key, value in defaults.items():
+            core.setdefault(key, value)
     migrated["version"] = SAVE_VERSION
     return migrated
 

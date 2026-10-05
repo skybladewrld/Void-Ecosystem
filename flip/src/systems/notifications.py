@@ -9,17 +9,26 @@ from dataclasses import dataclass
 class Notification:
     title: str
     message: str
+    priority: str = "INFO"
     remaining: float = 3.4
     duration: float = 3.4
 
 
 class NotificationCenter:
-    def __init__(self):
+    PRIORITIES = ("INFO", "REWARD", "IMPORTANT", "SYSTEM")
+
+    def __init__(self, history: list[dict] | None = None):
         self.queue: list[Notification] = []
         self.active: Notification | None = None
+        self.history = list(history or [])[-20:]
 
-    def push(self, title: str, message: str) -> None:
-        self.queue.append(Notification(title[:28], message[:80]))
+    def push(self, title: str, message: str, priority: str = "INFO") -> None:
+        priority = priority if priority in self.PRIORITIES else "INFO"
+        note = Notification(title[:28], message[:80], priority)
+        self.queue.append(note)
+        self.queue = self.queue[-30:]
+        self.history.append({"title": note.title, "message": note.message, "priority": priority})
+        self.history = self.history[-20:]
         if self.active is None:
             self.active = self.queue.pop(0)
 
