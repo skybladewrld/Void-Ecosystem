@@ -1,6 +1,6 @@
 # Void Ecosystem
 
-Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The current build is **Void Flip v0.3 — Living System**.
+Void Ecosystem is a planned family of portable, local-first devices built around games, companions, multiplayer, trading, and creative tools. The current build is **Void Flip v0.3.1 — Depth & Polish**.
 
 ## The devices
 
@@ -23,10 +23,12 @@ py flip/src/main.py
 
 ## Project status
 
-Void Flip v0.3 makes that persistent loop feel alive. Nyx now has contextual behavior, expressions, reactions, and thoughts. Daily and weekly quests, streaks, three game-mastery tracks, twelve one-time challenges, a discovery Codex, 22 achievements, priority notifications, procedural system audio, and a local Profile view all feed one schema-v3 save.
+Void Flip v0.3.1 turns the Living System into a more coherent handheld shell. Nyx uses five focused tabs, game detail pages expose mastery and challenges before launch, Market purchases require confirmation, scrollable views retain their selection through layered Back navigation, and every major module has useful lower-screen context.
+
+Blackglass now presents the human side at the bottom, explains mandatory captures, highlights capturing pieces and destinations, provides a rules screen, delays CPU input only long enough to show thinking feedback, and exposes complete match telemetry.
 
 Three complete games are included: **Void Merge 2048**, **Signal Serpent**, and **Blackglass Checkers**. Blackglass supports a lightweight Easy/Normal/Hard CPU and reward-free local hot-seat play. Every rewarded game reports results through the centralized, duplicate-safe trust boundary instead of editing profile currency directly.
 
-See [the v0.3 release notes](docs/v0.3.md), [community game API design](docs/game-api.md), [game roadmap](docs/game-roadmap.md), [simulator details](flip/README.md), and [architecture](docs/architecture.md).
+See [the v0.3.1 release notes](docs/v0.3.1.md), [community game API design](docs/game-api.md), [game roadmap](docs/game-roadmap.md), [simulator details](flip/README.md), and [architecture](docs/architecture.md).
 
 Flux is fictional in-device currency only. It cannot be purchased with real money or redeemed for real-world value.

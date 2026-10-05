@@ -1,6 +1,20 @@
 # Void Flip
 
-Void Flip is the portable handheld in the Void Ecosystem. Version 0.3 deepens its connected progression loop into a Living System.
+Void Flip is the portable handheld in the Void Ecosystem. Version 0.3.1 is a focused Depth & Polish release for its Living System.
+
+## What v0.3.1 improves
+
+- Five-tab Nyx interface: Status, Care, Items, Relics, and Journal
+- Bounded scrolling lists with automatic selection tracking and position restoration
+- Emerging Nyx personality traits derived from real care patterns
+- Game detail pages with mastery, records, challenge progress, controls, rewards, and launch state
+- Human-bottom Blackglass perspective, mandatory-capture messaging/highlights, rules, richer HUD, and CPU-thinking feedback
+- Two-step Market purchase confirmation and exact affordability messaging
+- Requirement-aware Workshop detail and category-based Codex browsing
+- Layered Back navigation that remembers list positions
+- Global Tab quick settings for volume, brightness, sound, battery, charging, and Node status
+- H-key simulated sleep/wake that pauses active games and preserves the current module
+- Local clock, clearer roadmap-only states, and more useful bottom-screen context
 
 ## What v0.3 adds
 
@@ -67,6 +81,8 @@ Every normal desktop simulator launch begins at 100%. Later Raspberry Pi hardwar
 | Restart | R during a game | Restart shortcut |
 | Blackglass mode | X | CPU / local hot-seat |
 | Blackglass CPU | Y | Easy / Normal / Hard |
+| Quick settings | Tab | Select button |
+| Sleep / wake | H | Home button |
 | Quit | Q | System shortcut |
 
 Select performs a care action, uses an item, equips a relic, crafts a recipe, or toggles a setting depending on the page. Back moves up one level.

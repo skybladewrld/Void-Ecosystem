@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.1 — Depth & Polish
+
+- Reoriented Blackglass around the human side and clarified mandatory captures
+- Added Blackglass rules, match telemetry, legal-piece highlighting, and CPU-thinking feedback
+- Rebuilt Voidling navigation as five bounded tabs with deeper action/item/relic details
+- Added game detail pages, Market confirmation, richer Workshop/Codex/Profile presentation, and intentional empty states
+- Added position-preserving layered navigation, quick settings, simulated sleep/wake, clock, and persistent display preferences
+- Added reusable scrolling, wrapping, perspective, capture-state, and recipe-availability helpers
+- Expanded automated coverage from 62 to 72 tests
+
 ## v0.3 — Living System
 
 - Added contextual Nyx behavior, thoughts, expressions, and lightweight procedural animation
